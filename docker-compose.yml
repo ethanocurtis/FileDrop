@@ -78,7 +78,10 @@ services:
       MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-209715200}
       MAX_FILES_PER_DROP: ${MAX_FILES_PER_DROP:-10}
     ports:
-      - "3000:3000"
+      # Host port is configurable via APP_PORT in .env.docker (default
+      # 3000) in case something else on the host already owns it. The
+      # container always listens on 3000 internally regardless.
+      - "${APP_PORT:-3000}:3000"
     # If you're fronting FileDrop with a reverse proxy that also runs in
     # Docker (Nginx Proxy Manager, Traefik, Caddy's docker-proxy, ...),
     # join it to that proxy's network instead of relying on the host port

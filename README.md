@@ -186,7 +186,10 @@ This builds the app image, starts Postgres and MinIO, creates the
 which runs `prisma migrate deploy` before the app starts), and starts a
 `cleanup` container that runs the expiry sweep every 15 minutes — no host
 cron needed. Visit `http://localhost:3000` (or your domain, once you've
-put a reverse proxy in front — see "Deploying").
+put a reverse proxy in front — see "Deploying"). If something else on the
+host already owns port 3000, set `APP_PORT` in `.env.docker` to a free
+port instead — the container always listens on 3000 internally regardless
+of which host port it's published on.
 
 ### 3. Operate it
 
