@@ -1,0 +1,86 @@
+// FileDrop database schema
+// A "Drop" is one share event (one shareable link) and can contain one or
+// more files. This lets the core single-file flow and the "multiple files
+// per link" nice-to-have share the same model without duplication.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DropStatus {
+  PENDING // created, waiting for file bytes to finish uploading
+  ACTIVE // available for download
+  EXPIRED // past expiresAt, or download/burn limit reached
+  DELETED // storage objects removed by cleanup job
+}
+
+model Drop {
+  id String @id @default(cuid())
+
+  /// Public, unguessable identifier used in share URLs (/f/{shareId}).
+  /// Never expose the internal `id` or storage keys to clients.
+  shareId String @unique
+
+  /// Optional bcrypt hash. Never store the plaintext password.
+  passwordHash String?
+
+  /// null = unlimited downloads. Otherwise the drop becomes unavailable
+  /// once downloadCount reaches maxDownloads.
+  maxDownloads Int?
+
+  /// Number of times a file in this drop has been successfully downloaded.
+  /// Mutated only via a single atomic UPDATE so concurrent requests can't
+  /// race past the configured limit.
+  downloadCount Int @default(0)
+
+  /// When true, the drop is marked EXPIRED as soon as the first download
+  /// completes, regardless of maxDownloads.
+  burnAfterRead Boolean @default(false)
+
+  status DropStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  /// IP hash / user agent are intentionally NOT stored to keep uploads
+  /// anonymous. Only what's required for rate limiting is kept, and that
+  /// lives in memory, not the database.
+  files UploadFile[]
+
+  @@index([shareId])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+model UploadFile {
+  id     String @id @default(cuid())
+  dropId String
+  drop   Drop   @relation(fields: [dropId], references: [id], onDelete: Cascade)
+
+  originalFileName String
+  sanitizedFileName String
+
+  /// Object storage key. Never exposed to clients.
+  storageKey String
+
+  /// Server-verified MIME type (sniffed from file bytes, not trusted from
+  /// the browser-supplied Content-Type).
+  mimeType String
+
+  /// Size in bytes, verified server-side against the bytes actually
+  /// received and written to storage.
+  size BigInt
+
+  status DropStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  @@index([dropId])
+  @@index([storageKey])
+}

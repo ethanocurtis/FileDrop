@@ -1,0 +1,57 @@
+export const EXPIRATION_OPTIONS = [
+  { value: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+  { value: "6h", label: "6 hours", ms: 6 * 60 * 60 * 1000 },
+  { value: "24h", label: "24 hours", ms: 24 * 60 * 60 * 1000 },
+  { value: "3d", label: "3 days", ms: 3 * 24 * 60 * 60 * 1000 },
+  { value: "7d", label: "7 days", ms: 7 * 24 * 60 * 60 * 1000 },
+] as const;
+
+export type ExpirationValue = (typeof EXPIRATION_OPTIONS)[number]["value"];
+
+export const DEFAULT_EXPIRATION: ExpirationValue = "24h";
+
+const EXPIRATION_MS = new Map(EXPIRATION_OPTIONS.map((o) => [o.value, o.ms]));
+
+export function isExpirationValue(value: string): value is ExpirationValue {
+  return EXPIRATION_MS.has(value as ExpirationValue);
+}
+
+export function expiresAtFor(value: ExpirationValue, from: Date = new Date()): Date {
+  const ms = EXPIRATION_MS.get(value);
+  if (!ms) throw new Error(`Unknown expiration option: ${value}`);
+  return new Date(from.getTime() + ms);
+}
+
+/**
+ * Human-friendly "time remaining" string, e.g. "17 hours", "42 minutes",
+ * "less than a minute". Returns null once the deadline has passed.
+ */
+export function formatTimeRemaining(expiresAt: Date, now: Date = new Date()): string | null {
+  const diffMs = expiresAt.getTime() - now.getTime();
+  if (diffMs <= 0) return null;
+
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diffMs >= day) {
+    const days = Math.round(diffMs / day);
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+  if (diffMs >= hour) {
+    const hours = Math.round(diffMs / hour);
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+  if (diffMs >= minute) {
+    const minutes = Math.round(diffMs / minute);
+    return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+  }
+  return "less than a minute";
+}
+
+export function formatAbsolute(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
