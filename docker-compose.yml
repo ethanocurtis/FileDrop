@@ -96,6 +96,12 @@ services:
     build: .
     image: filedrop:latest
     restart: unless-stopped
+    # The image's HEALTHCHECK (from the Dockerfile) checks the web
+    # server's /api/health — but this container runs the sweep loop
+    # instead, so nothing ever listens on 3000 here and that check would
+    # permanently report "unhealthy" despite the container working fine.
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy
