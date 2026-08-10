@@ -260,20 +260,26 @@ plain Linux Docker Engine).
 
    Once that's up, you can also remove the `app` service's `ports:`
    mapping from `docker-compose.yml` if you like — once the proxy reaches
-   `app` directly over the shared network, publishing the port to the host
-   isn't needed. (If you do, that's an actual edit to the tracked file, so
-   commit it rather than leaving it as local drift.)
+   `filedrop-app` directly over the shared network, publishing the port to
+   the host isn't needed. (If you do, that's an actual edit to the tracked
+   file, so commit it rather than leaving it as local drift.)
 
 3. In your reverse proxy's UI/config, point it at:
-   - **Forward Hostname/IP:** `app` (the compose service name — Docker's
-     embedded DNS resolves it automatically for containers on the same
-     network)
+   - **Forward Hostname/IP:** `filedrop-app` — **not** `app`. The override
+     example gives this container an explicit alias rather than relying
+     on the default (service-name-based) one, because Nginx Proxy
+     Manager's own official docker-compose setup also names its service
+     `app` — two containers sharing that alias on the same network means
+     Docker's DNS can resolve it to *either* one, and your reverse proxy
+     may end up routing to itself instead of FileDrop. `filedrop-app` sidesteps
+     that regardless of what your reverse proxy's own service happens to
+     be named.
    - **Forward Port:** `3000`
 
    For Nginx Proxy Manager specifically: Proxy Hosts → Add Proxy Host →
-   Forward Hostname/IP `app`, Forward Port `3000`, Scheme `http`. Request
-   a Let's Encrypt certificate under the SSL tab and force SSL. NPM's
-   default proxy template already sets `X-Forwarded-For`/
+   Forward Hostname/IP `filedrop-app`, Forward Port `3000`, Scheme `http`.
+   Request a Let's Encrypt certificate under the SSL tab and force SSL.
+   NPM's default proxy template already sets `X-Forwarded-For`/
    `X-Forwarded-Proto` (FileDrop's rate limiter and share-link generation
    depend on those being set correctly), so no extra header config is
    needed. Do add a body-size override under the Advanced tab, since NPM's

@@ -13,12 +13,25 @@
 # (Nginx Proxy Manager, Traefik, Caddy's docker-proxy, ...) — see README
 # "Running behind a Docker-based reverse proxy" for the full walkthrough.
 # Swap `proxy_net` for your actual network name (`docker network ls`).
+#
+# Note the explicit `aliases:` below rather than just listing the network
+# name — Nginx Proxy Manager's own official docker-compose setup names its
+# service "app" too, and Docker's embedded DNS doesn't error on two
+# containers sharing a network alias, it just nondeterministically
+# resolves to one of them — which can mean your reverse proxy silently
+# starts routing traffic to the *other* app's "app" container instead of
+# this one. Giving this container an explicit, collision-proof alias
+# (`filedrop-app`) avoids that regardless of what your reverse proxy's own
+# service happens to be named. Point your reverse proxy's Forward
+# Hostname/IP at `filedrop-app`, not `app`.
 
 services:
   app:
     networks:
-      - default
-      - proxy_net
+      default: {}
+      proxy_net:
+        aliases:
+          - filedrop-app
 
 networks:
   proxy_net:
