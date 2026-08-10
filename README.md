@@ -218,6 +218,59 @@ using the regular `.env` (from `.env.example`) pointed at your external
 database/bucket. The container still runs `prisma migrate deploy` on
 startup either way.
 
+### Running behind a Docker-based reverse proxy
+
+If your reverse proxy also runs in Docker — Nginx Proxy Manager, Traefik,
+Caddy's docker-proxy, etc. — route to FileDrop over a shared Docker
+network instead of through the host port mapping. It's more secure (the
+app container is never reachable except through the proxy) and avoids
+proxy-to-host networking quirks (`host.docker.internal` isn't reliable on
+plain Linux Docker Engine).
+
+1. Find the network your reverse proxy's own compose stack already
+   created (`docker network ls` — commonly `<project-dir-name>_default`),
+   or make a dedicated one:
+
+   ```bash
+   docker network create proxy_net
+   ```
+
+   Add it to your reverse proxy's compose file too if you created a new
+   one, then restart that stack.
+
+2. In FileDrop's `docker-compose.yml`, uncomment the `networks:` override
+   on the `app` service and the `networks:` block at the bottom of the
+   file (swap in your actual network name if it's not `proxy_net`), then:
+
+   ```bash
+   docker compose --env-file .env.docker up -d
+   ```
+
+   You can also remove the `app` service's `ports: ["3000:3000"]` mapping
+   at this point — once the proxy reaches `app` directly over the shared
+   network, publishing the port to the host isn't needed.
+
+3. In your reverse proxy's UI/config, point it at:
+   - **Forward Hostname/IP:** `app` (the compose service name — Docker's
+     embedded DNS resolves it automatically for containers on the same
+     network)
+   - **Forward Port:** `3000`
+
+   For Nginx Proxy Manager specifically: Proxy Hosts → Add Proxy Host →
+   Forward Hostname/IP `app`, Forward Port `3000`, Scheme `http`. Request
+   a Let's Encrypt certificate under the SSL tab and force SSL. NPM's
+   default proxy template already sets `X-Forwarded-For`/
+   `X-Forwarded-Proto` (FileDrop's rate limiter and share-link generation
+   depend on those being set correctly), so no extra header config is
+   needed. Do add a body-size override under the Advanced tab, since NPM's
+   default is too small for file uploads:
+
+   ```
+   client_max_body_size 210M;
+   ```
+
+   (matching, with headroom, whatever `MAX_UPLOAD_SIZE_BYTES` is set to).
+
 ## Development scripts
 
 | Command              | What it does                                             |

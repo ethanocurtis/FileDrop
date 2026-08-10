@@ -79,6 +79,13 @@ services:
       MAX_FILES_PER_DROP: ${MAX_FILES_PER_DROP:-10}
     ports:
       - "3000:3000"
+    # If you're fronting FileDrop with a reverse proxy that also runs in
+    # Docker (Nginx Proxy Manager, Traefik, Caddy's docker-proxy, ...),
+    # join it to that proxy's network instead of relying on the host port
+    # above — see README "Running behind a Docker-based reverse proxy".
+    # networks:
+    #   - default
+    #   - proxy_net
 
   # Runs the expiry sweep on a timer inside its own container — no host
   # cron needed. Same image as `app`, just a different command.
@@ -106,3 +113,11 @@ services:
 volumes:
   postgres-data:
   minio-data:
+
+# Uncomment along with the `app` service's `networks:` override above to
+# join a reverse proxy's Docker network (see README). Must already exist
+# — e.g. `docker network create proxy_net`, or reuse the network your
+# reverse-proxy's own compose stack created (`docker network ls`).
+# networks:
+#   proxy_net:
+#     external: true
