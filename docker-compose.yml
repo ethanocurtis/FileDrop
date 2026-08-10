@@ -1,0 +1,108 @@
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-filedrop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-filedrop}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-filedrop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Not published to the host — only reachable from other compose
+    # services. Add a `ports:` mapping here if you need to connect a local
+    # DB client directly.
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Uncomment to browse the MinIO console at http://localhost:9001.
+    # ports:
+    #   - "9001:9001"
+
+  # One-shot job: creates the "filedrop" bucket, then exits. app/cleanup
+  # wait on this completing successfully before they start.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" &&
+      mc mb --ignore-existing local/filedrop &&
+      exit 0
+      "
+
+  app:
+    build: .
+    image: filedrop:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    environment: &app-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-filedrop}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-filedrop}?schema=public
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: filedrop
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_FORCE_PATH_STYLE: "true"
+      DOWNLOAD_TOKEN_SECRET: ${DOWNLOAD_TOKEN_SECRET:?Set DOWNLOAD_TOKEN_SECRET in .env}
+      CLEANUP_SECRET: ${CLEANUP_SECRET:?Set CLEANUP_SECRET in .env}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-209715200}
+      MAX_FILES_PER_DROP: ${MAX_FILES_PER_DROP:-10}
+    ports:
+      - "3000:3000"
+
+  # Runs the expiry sweep on a timer inside its own container — no host
+  # cron needed. Same image as `app`, just a different command.
+  cleanup:
+    build: .
+    image: filedrop:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    environment: *app-env
+    entrypoint: ["entrypoint.sh"]
+    command: >
+      /bin/sh -c "
+      while true; do
+        npx tsx scripts/cleanup.ts;
+        sleep 900;
+      done
+      "
+
+volumes:
+  postgres-data:
+  minio-data:

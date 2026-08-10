@@ -69,6 +69,9 @@ scripts/
   cleanup.ts                 Standalone cleanup runner for cron/systemd (no HTTP round trip)
   dev-s3.mjs                 Local S3-compatible mock server for development
 tests/                        Vitest unit + integration tests
+Dockerfile                    Multi-stage production image (see "Running with Docker")
+docker-compose.yml            App + Postgres + MinIO + a scheduled cleanup container
+docker/entrypoint.sh          Runs `prisma migrate deploy` before the app/cleanup command
 ```
 
 ## Getting started
@@ -140,6 +143,80 @@ npm run dev
 ```
 
 Visit `http://localhost:3000`.
+
+## Running with Docker
+
+The steps above run FileDrop directly with Node; `docker compose` runs the
+whole stack — the app, Postgres, MinIO (self-hosted S3-compatible storage),
+and a scheduled cleanup container — with one command instead. This is the
+easiest way to run FileDrop on a VM.
+
+### 1. Configure
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+Edit `.env.docker` — set real values for `POSTGRES_PASSWORD`,
+`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`, and generate the two secrets:
+
+```bash
+openssl rand -hex 32   # DOWNLOAD_TOKEN_SECRET
+openssl rand -hex 32   # CLEANUP_SECRET
+```
+
+Set `NEXT_PUBLIC_APP_URL` to wherever you'll actually reach the app (e.g.
+`https://your-domain.com` once you've put a reverse proxy in front of it —
+see "Deploying" below).
+
+This is a deliberately different file from `.env`/`.env.example` (which are
+for running the app directly with `npm run dev`) — `docker-compose.yml`
+sets `DATABASE_URL`/`S3_*` itself, wired to the `postgres`/`minio` service
+names, so `.env.docker` only needs to supply credentials and app-level
+config, not connection strings.
+
+### 2. Build and start
+
+```bash
+docker compose --env-file .env.docker up -d --build
+```
+
+This builds the app image, starts Postgres and MinIO, creates the
+`filedrop` bucket, applies database migrations (via `docker/entrypoint.sh`,
+which runs `prisma migrate deploy` before the app starts), and starts a
+`cleanup` container that runs the expiry sweep every 15 minutes — no host
+cron needed. Visit `http://localhost:3000` (or your domain, once you've
+put a reverse proxy in front — see "Deploying").
+
+### 3. Operate it
+
+```bash
+docker compose --env-file .env.docker logs -f app       # tail app logs
+docker compose --env-file .env.docker logs -f cleanup   # tail cleanup runs
+docker compose --env-file .env.docker ps                # container status / health
+docker compose --env-file .env.docker down               # stop everything
+docker compose --env-file .env.docker down -v             # stop and wipe all data (careful)
+```
+
+Postgres and MinIO data live in named Docker volumes (`postgres-data`,
+`minio-data`) — they persist across `docker compose up`/`down`, just not
+across `down -v`.
+
+If your build environment can't reach Docker Hub directly (e.g. it's
+behind a restrictive proxy), override the base image with
+`--build-arg NODE_BASE_IMAGE=your-mirror/node:20-bookworm-slim`.
+
+**Bring your own Postgres/S3 instead of the bundled containers?** Skip
+`docker-compose.yml` and just run the `app` image directly:
+
+```bash
+docker build -t filedrop .
+docker run -d --name filedrop -p 3000:3000 --env-file .env filedrop
+```
+
+using the regular `.env` (from `.env.example`) pointed at your external
+database/bucket. The container still runs `prisma migrate deploy` on
+startup either way.
 
 ## Development scripts
 
