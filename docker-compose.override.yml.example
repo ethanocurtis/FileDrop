@@ -1,0 +1,25 @@
+# Copy this file to docker-compose.override.yml (same directory as
+# docker-compose.yml) to apply deployment-specific tweaks without ever
+# editing docker-compose.yml itself. Docker Compose merges
+# docker-compose.override.yml in automatically — no extra flags needed —
+# so `docker compose --env-file .env.docker up -d` picks it up on its own.
+#
+# Keeping local/environment-specific changes here (rather than editing the
+# tracked docker-compose.yml directly) means `git pull` always applies
+# cleanly, with zero risk of conflicting with — or accidentally reverting —
+# a hand-edited line in the tracked file.
+#
+# Example below: joining `app` to a Docker-based reverse proxy's network
+# (Nginx Proxy Manager, Traefik, Caddy's docker-proxy, ...) — see README
+# "Running behind a Docker-based reverse proxy" for the full walkthrough.
+# Swap `proxy_net` for your actual network name (`docker network ls`).
+
+services:
+  app:
+    networks:
+      - default
+      - proxy_net
+
+networks:
+  proxy_net:
+    external: true

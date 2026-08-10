@@ -71,6 +71,7 @@ scripts/
 tests/                        Vitest unit + integration tests
 Dockerfile                    Multi-stage production image (see "Running with Docker")
 docker-compose.yml            App + Postgres + MinIO + a scheduled cleanup container
+docker-compose.override.yml.example  Template for deployment-specific tweaks (e.g. reverse-proxy network)
 docker/entrypoint.sh          Runs `prisma migrate deploy` before the app/cleanup command
 ```
 
@@ -241,17 +242,27 @@ plain Linux Docker Engine).
    Add it to your reverse proxy's compose file too if you created a new
    one, then restart that stack.
 
-2. In FileDrop's `docker-compose.yml`, uncomment the `networks:` override
-   on the `app` service and the `networks:` block at the bottom of the
-   file (swap in your actual network name if it's not `proxy_net`), then:
+2. Copy `docker-compose.override.yml.example` to `docker-compose.override.yml`
+   and swap in your actual network name if it's not `proxy_net`:
+
+   ```bash
+   cp docker-compose.override.yml.example docker-compose.override.yml
+   ```
+
+   Docker Compose merges this in automatically — no flags needed. Using an
+   override file instead of editing `docker-compose.yml` directly matters:
+   it's gitignored, so this deployment-specific tweak never conflicts with
+   (or gets silently lost to) a future `git pull`. Then:
 
    ```bash
    docker compose --env-file .env.docker up -d
    ```
 
-   You can also remove the `app` service's `ports: ["3000:3000"]` mapping
-   at this point — once the proxy reaches `app` directly over the shared
-   network, publishing the port to the host isn't needed.
+   Once that's up, you can also remove the `app` service's `ports:`
+   mapping from `docker-compose.yml` if you like — once the proxy reaches
+   `app` directly over the shared network, publishing the port to the host
+   isn't needed. (If you do, that's an actual edit to the tracked file, so
+   commit it rather than leaving it as local drift.)
 
 3. In your reverse proxy's UI/config, point it at:
    - **Forward Hostname/IP:** `app` (the compose service name — Docker's

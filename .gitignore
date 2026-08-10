@@ -47,3 +47,6 @@ next-env.d.ts
 # local S3 mock data (npm run dev:s3)
 /.s3rver-data
 
+# deployment-specific compose overrides (see docker-compose.override.yml.example)
+docker-compose.override.yml
+

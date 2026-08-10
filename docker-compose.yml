@@ -83,12 +83,14 @@ services:
       # container always listens on 3000 internally regardless.
       - "${APP_PORT:-3000}:3000"
     # If you're fronting FileDrop with a reverse proxy that also runs in
-    # Docker (Nginx Proxy Manager, Traefik, Caddy's docker-proxy, ...),
-    # join it to that proxy's network instead of relying on the host port
-    # above — see README "Running behind a Docker-based reverse proxy".
-    # networks:
-    #   - default
-    #   - proxy_net
+    # Docker (Nginx Proxy Manager, Traefik, Caddy's docker-proxy, ...), add
+    # this service to that proxy's network via docker-compose.override.yml
+    # rather than editing this file — see docker-compose.override.yml.example
+    # and README "Running behind a Docker-based reverse proxy". Keeping
+    # deployment-specific tweaks in an override file (which docker compose
+    # merges in automatically, un-tracked by git) means this file always
+    # matches what's in the repo, and `git pull` never conflicts with a
+    # local edit here.
 
   # Runs the expiry sweep on a timer inside its own container — no host
   # cron needed. Same image as `app`, just a different command.
@@ -122,11 +124,3 @@ services:
 volumes:
   postgres-data:
   minio-data:
-
-# Uncomment along with the `app` service's `networks:` override above to
-# join a reverse proxy's Docker network (see README). Must already exist
-# — e.g. `docker network create proxy_net`, or reuse the network your
-# reverse-proxy's own compose stack created (`docker network ls`).
-# networks:
-#   proxy_net:
-#     external: true
