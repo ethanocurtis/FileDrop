@@ -24,9 +24,21 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# DATABASE_URL isn't needed to *build* the app (no DB access at build time),
-# but Prisma's generator/build tooling expects the env var to exist.
-ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db"
+# None of these are used for anything at build time — no DB/storage access
+# or real requests happen during `next build`. But Next.js statically
+# imports every route module (even fully dynamic ones) to collect page
+# data, which pulls in src/lib/env.ts, and that validates all required
+# vars eagerly at module-load time. Without placeholders here, the build
+# fails before it ever reaches a real request. Real values are supplied at
+# container *runtime* via docker-compose.yml / --env-file, not baked in
+# here.
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db" \
+    S3_ENDPOINT="http://localhost:9000" \
+    S3_BUCKET="build-placeholder" \
+    S3_ACCESS_KEY_ID="build-placeholder" \
+    S3_SECRET_ACCESS_KEY="build-placeholder" \
+    DOWNLOAD_TOKEN_SECRET="build-placeholder-not-a-real-secret-0000000000" \
+    CLEANUP_SECRET="build-placeholder-not-a-real-secret-00000000000000"
 RUN npx prisma generate
 RUN npm run build
 
