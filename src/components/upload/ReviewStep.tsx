@@ -72,15 +72,15 @@ export function ReviewStep({
         <OptionsPanel options={options} onChange={onOptionsChange} />
       </div>
 
-      <div className="mt-8 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row-reverse">
-        <Button onClick={onUpload} disabled={files.length === 0} className="flex-1">
+      <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row-reverse">
+        <Button size="lg" onClick={onUpload} disabled={files.length === 0} className="flex-1">
           {files.length === 0
             ? "Select a file"
             : files.length === 1
               ? "Upload File"
               : `Upload ${files.length} Files`}
         </Button>
-        <Button variant="secondary" onClick={onCancel} className="flex-1">
+        <Button size="lg" variant="secondary" onClick={onCancel} className="flex-1">
           Cancel
         </Button>
       </div>
