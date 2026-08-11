@@ -25,11 +25,14 @@ export function P2pStatusPanel({
   status,
   role,
   progress,
+  speed,
   errorMessage,
 }: {
   status: P2pStatus;
   role: "sender" | "receiver";
   progress: { transferred: number; total: number } | null;
+  /** Bytes/sec, smoothed — see useTransferSpeed. Only shown while actively transferring. */
+  speed: number;
   errorMessage: string | null;
 }) {
   const label = STATUS_LABEL[status][role];
@@ -51,9 +54,12 @@ export function P2pStatusPanel({
       {showProgress && progress && (
         <div className="mt-3">
           <ProgressBar value={(progress.transferred / Math.max(progress.total, 1)) * 100} />
-          <p className="mt-2 text-xs text-muted-foreground">
-            {formatBytes(progress.transferred)} of {formatBytes(progress.total)}
-          </p>
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <p>
+              {formatBytes(progress.transferred)} of {formatBytes(progress.total)}
+            </p>
+            {status === "transferring" && speed > 0 && <p>{formatBytes(speed)}/s</p>}
+          </div>
         </div>
       )}
 

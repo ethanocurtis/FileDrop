@@ -12,6 +12,7 @@ import { QrCode } from "@/components/ui/QrCode";
 import { createP2pTransfer } from "@/lib/p2p/client/api";
 import { ApiError } from "@/lib/client/api";
 import { startP2pSender, type P2pSession, type P2pStatus } from "@/lib/p2p/client/webrtc";
+import { useTransferSpeed } from "@/lib/p2p/client/useTransferSpeed";
 import { DEFAULT_EXPIRATION, formatAbsolute, type ExpirationValue } from "@/lib/utils/time";
 
 type Phase = "idle" | "reviewing" | "active";
@@ -29,6 +30,7 @@ export function P2pSendFlow() {
   const [status, setStatus] = useState<P2pStatus>("connecting-signal");
   const [progress, setProgress] = useState<{ transferred: number; total: number } | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const speed = useTransferSpeed(progress?.transferred ?? 0, status === "transferring");
 
   const sessionRef = useRef<P2pSession | null>(null);
 
@@ -157,6 +159,7 @@ export function P2pSendFlow() {
             status={status}
             role="sender"
             progress={progress}
+            speed={speed}
             errorMessage={transferError}
           />
         </div>

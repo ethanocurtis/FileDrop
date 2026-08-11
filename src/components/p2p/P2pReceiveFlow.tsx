@@ -16,6 +16,7 @@ import {
   type FileSink,
 } from "@/lib/p2p/client/fileSink";
 import { startP2pReceiver, type P2pSession, type P2pStatus } from "@/lib/p2p/client/webrtc";
+import { useTransferSpeed } from "@/lib/p2p/client/useTransferSpeed";
 import { formatBytes } from "@/lib/utils/bytes";
 import type { P2pTransferMetadataResponse } from "@/types/p2p";
 
@@ -42,6 +43,7 @@ export function P2pReceiveFlow({ shareId, initial }: { shareId: string; initial:
   const [status, setStatus] = useState<P2pStatus>("connecting-signal");
   const [progress, setProgress] = useState<{ transferred: number; total: number } | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const speed = useTransferSpeed(progress?.transferred ?? 0, status === "transferring");
 
   const sessionRef = useRef<P2pSession | null>(null);
 
@@ -139,6 +141,7 @@ export function P2pReceiveFlow({ shareId, initial }: { shareId: string; initial:
             status={status}
             role="receiver"
             progress={progress}
+            speed={speed}
             errorMessage={transferError}
           />
           {status === "done" && (
