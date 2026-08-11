@@ -77,6 +77,8 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-209715200}
       MAX_FILES_PER_DROP: ${MAX_FILES_PER_DROP:-10}
+      LARGE_FILE_THRESHOLD_BYTES: ${LARGE_FILE_THRESHOLD_BYTES:-1073741824}
+      LARGE_FILE_MAX_EXPIRATION: ${LARGE_FILE_MAX_EXPIRATION:-24h}
       # Optional — peer-to-peer transfers work without these (direct
       # connections only). Only needed if you've enabled the coturn
       # service below. Left blank (the default) rather than unset, so this

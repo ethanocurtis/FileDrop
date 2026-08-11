@@ -19,6 +19,13 @@ process.env.S3_SECRET_ACCESS_KEY ??= "S3RVER";
 process.env.S3_FORCE_PATH_STYLE ??= "true";
 process.env.DOWNLOAD_TOKEN_SECRET ??= "test-download-token-secret-not-for-production";
 process.env.CLEANUP_SECRET ??= "test-cleanup-secret-not-for-production";
+// Unconditional override (not ??=): dotenv/config above may have already
+// loaded a real value from .env, and tests need a size ceiling higher
+// than the app's own 200MB default to exercise the large-file-
+// expiration-cap behavior (default threshold 1GB) without tripping the
+// unrelated per-file size limit first — see tests/drop-service.test.ts.
+// Doesn't affect the shipped default.
+process.env.MAX_UPLOAD_SIZE_BYTES = "2147483648"; // 2 GB
 // Set so tests can exercise the TURN-configured branch of getIceServers()
 // (see tests/turn-credentials.test.ts) — no real coturn instance needed,
 // it's a pure HMAC credential-generation function.

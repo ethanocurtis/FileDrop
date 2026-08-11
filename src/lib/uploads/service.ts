@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { buildStorageKey, deleteObject } from "@/lib/storage/s3";
-import { generateShareId } from "@/lib/security/ids";
+import { generateDeleteToken, generateShareId } from "@/lib/security/ids";
 import { hashPassword } from "@/lib/security/password";
 import { sanitizeFileName } from "@/lib/validation/filename";
 import {
@@ -9,7 +9,8 @@ import {
   assertFileCountIsAllowed,
   FileValidationError,
 } from "@/lib/validation/file";
-import { expiresAtFor, type ExpirationValue } from "@/lib/utils/time";
+import { env } from "@/lib/env";
+import { expiresAtFor, expirationMsFor, type ExpirationValue } from "@/lib/utils/time";
 import type { DropStatus } from "@/generated/prisma";
 import type { CreateDropFileInput } from "@/types/drop";
 
@@ -22,7 +23,11 @@ export interface PreparedDropFile {
 export interface PreparedDrop {
   dropId: string;
   shareId: string;
+  deleteToken: string;
   expiresAt: Date;
+  /** True if the requested expiration was reduced because a file was at
+   * or over LARGE_FILE_THRESHOLD_BYTES — see the clamping logic below. */
+  expirationClamped: boolean;
   files: PreparedDropFile[];
 }
 
@@ -50,8 +55,20 @@ export async function prepareDrop(input: {
 
   const dropId = randomUUID();
   const shareId = generateShareId();
-  const expiresAt = expiresAtFor(input.expiration);
+  const deleteToken = generateDeleteToken();
   const passwordHash = input.password ? await hashPassword(input.password) : null;
+
+  // Large files sit in storage longer for the same requested expiration,
+  // which costs more (and, if it's something sensitive, extends the
+  // exposure window) — clamp down to the policy max instead of rejecting
+  // the request outright. Only ever shortens: a file over the threshold
+  // whose requested expiration is already <= the cap is left alone.
+  const maxFileSize = Math.max(...input.files.map((f) => f.size));
+  const isLargeFile = maxFileSize >= env.LARGE_FILE_THRESHOLD_BYTES;
+  const exceedsCap =
+    isLargeFile && expirationMsFor(input.expiration) > expirationMsFor(env.LARGE_FILE_MAX_EXPIRATION);
+  const effectiveExpiration = exceedsCap ? env.LARGE_FILE_MAX_EXPIRATION : input.expiration;
+  const expiresAt = expiresAtFor(effectiveExpiration);
 
   const preparedFiles: PreparedDropFile[] = input.files.map((file) => {
     const fileId = randomUUID();
@@ -66,6 +83,7 @@ export async function prepareDrop(input: {
     data: {
       id: dropId,
       shareId,
+      deleteToken,
       passwordHash,
       maxDownloads: input.maxDownloads ?? null,
       burnAfterRead: input.burnAfterRead ?? false,
@@ -85,7 +103,7 @@ export async function prepareDrop(input: {
     },
   });
 
-  return { dropId, shareId, expiresAt, files: preparedFiles };
+  return { dropId, shareId, deleteToken, expiresAt, expirationClamped: exceedsCap, files: preparedFiles };
 }
 
 /**
@@ -188,4 +206,49 @@ export async function getActiveDropByShareId(shareId: string): Promise<DropWithF
 
   if (drop.status !== "ACTIVE") return null;
   return drop;
+}
+
+export type DeleteDropResult =
+  | { ok: true }
+  | { ok: false; reason: "not_found" | "invalid_token" };
+
+/**
+ * Lets the uploader delete their own drop early, using the capability
+ * token they were shown once at creation time — there are no accounts,
+ * so this token is the only proof of "I made this" available. Deletes
+ * every storage object best-effort, then marks the row DELETED (kept,
+ * not hard-deleted, so a later visit to /f/{shareId} still gets a clean
+ * "no longer available" instead of an ambiguous 404 — same reasoning as
+ * the cleanup job).
+ *
+ * Works from any non-DELETED status (PENDING/ACTIVE/EXPIRED) — someone
+ * who has the token clearly wants it gone regardless of where the drop
+ * currently stands in its lifecycle.
+ */
+export async function deleteDropByToken(shareId: string, token: string): Promise<DeleteDropResult> {
+  const drop = await prisma.drop.findUnique({
+    where: { shareId },
+    include: { files: true },
+  });
+  if (!drop || drop.status === "DELETED") {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const provided = Buffer.from(token);
+  const expected = Buffer.from(drop.deleteToken);
+  const validToken =
+    provided.length === expected.length && timingSafeEqual(provided, expected);
+  if (!validToken) {
+    return { ok: false, reason: "invalid_token" };
+  }
+
+  for (const file of drop.files) {
+    await deleteObject(file.storageKey).catch(() => {
+      // Best-effort, same as the cleanup job — an object that's already
+      // gone (or never finished uploading) isn't a reason to fail this.
+    });
+  }
+
+  await prisma.drop.update({ where: { id: drop.id }, data: { status: "DELETED" } });
+  return { ok: true };
 }

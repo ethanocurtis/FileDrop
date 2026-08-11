@@ -22,3 +22,13 @@ export function generateShareId(length = 22): string {
 export function generateStorageId(): string {
   return randomUUID();
 }
+
+/**
+ * Capability token proving "I created this drop" well enough to delete it
+ * early, without accounts (see Drop.deleteToken). Longer than a share ID
+ * since it's never meant to be typed or read aloud — only ever handled
+ * by the uploader's own browser, copied programmatically.
+ */
+export function generateDeleteToken(): string {
+  return generateShareId(32);
+}

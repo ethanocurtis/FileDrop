@@ -51,6 +51,27 @@ Upload → Store → Generate Link → Open Link → Download → Expire → Del
 5. A cleanup job (see below) — and a lazy check on every link visit —
    deletes anything past its expiration.
 
+**Deleting early.** There are no accounts, so the only proof that you're
+the one who created a drop is a capability token (`deleteToken`) shown
+once, right on the success screen, after upload — a "Delete Now" button
+right there uses it immediately via `DELETE /api/share/:shareId`, no need
+to copy or save it anywhere. Refresh the page or come back later and
+it's gone from view — same trade-off as everything else here (no
+accounts, nothing persisted client-side), so use it in the moment if you
+need it.
+
+**Large files get a shorter expiration automatically.** A file at or over
+`LARGE_FILE_THRESHOLD_BYTES` (default 1 GB) has its expiration capped to
+`LARGE_FILE_MAX_EXPIRATION` (default 24 hours) regardless of what was
+selected — longer-lived large files cost more in storage and extend the
+exposure window for anything sensitive. It only ever shortens: picking
+something already under the cap is left alone, and the response tells
+the UI whether this happened (`expirationClamped`) so it can explain why.
+Doesn't apply to peer-to-peer transfers, which never touch server storage
+in the first place. Note this only has any effect once
+`MAX_UPLOAD_SIZE_BYTES` (default 200 MB) is raised above the threshold —
+see "Configuration reference".
+
 ## Peer-to-peer transfers
 
 The `/p2p` tab is a second, independent way to send a file — it never
@@ -443,7 +464,10 @@ anywhere), just the small metadata row itself.
 ## Security notes
 
 - Share IDs are generated with `crypto.randomBytes` (~128 bits of entropy)
-  — see `src/lib/security/ids.ts`.
+  — see `src/lib/security/ids.ts`. The delete-now capability token is the
+  same generator at a longer length (~190 bits), compared with a
+  constant-time check (`timingSafeEqual`) so a timing side-channel can't
+  narrow it down byte by byte.
 - Uploaded file names are sanitized (path components, control characters,
   and header-unsafe characters stripped) before being stored or used in a
   `Content-Disposition` header.
@@ -488,13 +512,18 @@ npm test
 Tests cover share ID generation, filename sanitization, file-size/type
 validation, password hashing, download-token signing, expiration checks
 (including a concurrency test proving download limits can't be raced),
-cleanup idempotency (for both the upload flow and peer-to-peer
-transfers), the P2P transfer metadata service (creation, expiry,
-password unlock, authorized-vs-not response shape), and TURN credential
-generation. Integration tests use a real Postgres database (pointed at
-by `TEST_DATABASE_URL`, falling back to
+early deletion via the delete-token capability, the large-file
+expiration cap, cleanup idempotency (for both the upload flow and
+peer-to-peer transfers), the P2P transfer metadata service (creation,
+expiry, password unlock, authorized-vs-not response shape), and TURN
+credential generation. Integration tests use a real Postgres database
+(pointed at by `TEST_DATABASE_URL`, falling back to
 `postgresql://filedrop:filedrop@localhost:5432/filedrop_test`) and mock
-object storage, so they don't require a running S3 endpoint.
+object storage, so they don't require a running S3 endpoint. Test files
+run sequentially rather than in parallel (`fileParallelism: false` in
+`vitest.config.ts`) since they share one real database and each resets
+it independently — running them concurrently made failures flaky rather
+than deterministic.
 
 The signaling WebSocket and the actual WebRTC data channel aren't
 covered by the Vitest suite (they need two real browsers, not just a
@@ -510,6 +539,11 @@ See `.env.example` for the full list. Notable ones:
   regardless of what the client claims (default 200 MB). Doesn't apply
   to peer-to-peer transfers — those never touch server storage.
 - `MAX_FILES_PER_DROP` — cap on files in a single drop (default 10).
+- `LARGE_FILE_THRESHOLD_BYTES` / `LARGE_FILE_MAX_EXPIRATION` — see "Large
+  files get a shorter expiration automatically" above (defaults: 1 GB,
+  24 hours). Only relevant if `MAX_UPLOAD_SIZE_BYTES` is raised above the
+  threshold — at the 200 MB default, no upload can reach 1 GB in the
+  first place, so this has no effect until both are changed together.
 - `TURN_SECRET` / `TURN_EXTERNAL_IP` / `TURN_PORT` — optional, enable a
   TURN relay fallback for peer-to-peer transfers (see "Peer-to-peer
   transfers" above). Both `TURN_SECRET` and `TURN_EXTERNAL_IP` need to be

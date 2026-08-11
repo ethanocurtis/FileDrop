@@ -1,11 +1,13 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, Info, RotateCcw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { QrCode } from "@/components/ui/QrCode";
 import { FileIcon } from "@/components/ui/FileIcon";
+import { deleteDrop, ApiError } from "@/lib/client/api";
 import { formatBytes } from "@/lib/utils/bytes";
 import { formatAbsolute } from "@/lib/utils/time";
 
@@ -19,13 +21,53 @@ export function UploadSuccess({
   files,
   expiresAt,
   shareUrl,
+  shareId,
+  deleteToken,
+  expirationClamped,
   onReset,
 }: {
   files: UploadedFileSummary[];
   expiresAt: Date;
   shareUrl: string;
+  shareId: string;
+  deleteToken: string;
+  expirationClamped: boolean;
   onReset: () => void;
 }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleConfirmDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteDrop(shareId, deleteToken);
+      setDeleted(true);
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "Could not delete this drop.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (deleted) {
+    return (
+      <Card className="w-full p-6 sm:p-8 text-center animate-fade-in">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-danger/15 text-danger">
+          <Trash2 className="h-5 w-5" strokeWidth={1.75} />
+        </div>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Drop deleted</h2>
+        <p className="mt-1 text-sm text-muted">The file and link are no longer available.</p>
+        <Button variant="secondary" onClick={onReset} className="mt-6 w-full">
+          <RotateCcw className="h-4 w-4" />
+          Upload Another File
+        </Button>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full p-6 sm:p-8 animate-fade-in">
       <div className="flex flex-col items-center text-center">
@@ -72,6 +114,13 @@ export function UploadSuccess({
           <p className="mt-3 text-xs text-muted-foreground">
             Expires <span className="text-muted">{formatAbsolute(expiresAt)}</span>
           </p>
+          {expirationClamped && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Large files get a shorter expiration automatically, so this link expires sooner
+              than what you picked.
+            </p>
+          )}
           <div className="mt-4 flex gap-2">
             <CopyButton value={shareUrl} className="flex-1 sm:flex-none" />
           </div>
@@ -81,10 +130,49 @@ export function UploadSuccess({
       </div>
 
       <div className="mt-8 border-t border-border pt-6">
-        <Button variant="secondary" onClick={onReset} className="w-full">
-          <RotateCcw className="h-4 w-4" />
-          Upload Another File
-        </Button>
+        {confirmingDelete ? (
+          <div className="animate-fade-in">
+            <p className="text-sm text-foreground">
+              Delete this drop now? The file and link stop working immediately — this can&apos;t
+              be undone.
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row-reverse">
+              <Button
+                variant="danger"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="flex-1"
+              >
+                {deleting ? "Deleting…" : "Yes, Delete It"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+            {deleteError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-danger">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                {deleteError}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+            <Button variant="secondary" onClick={onReset} className="flex-1">
+              <RotateCcw className="h-4 w-4" />
+              Upload Another File
+            </Button>
+            <Button variant="danger" onClick={() => setConfirmingDelete(true)} className="flex-1">
+              <Trash2 className="h-4 w-4" />
+              Delete Now
+            </Button>
+          </div>
+        )}
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">

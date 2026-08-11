@@ -22,6 +22,16 @@ export function expiresAtFor(value: ExpirationValue, from: Date = new Date()): D
   return new Date(from.getTime() + ms);
 }
 
+/** Duration of an expiration option, in milliseconds — lets callers
+ * compare two options (e.g. "is the requested expiration longer than
+ * the policy cap for large files?") without hardcoding the ms table
+ * themselves. */
+export function expirationMsFor(value: ExpirationValue): number {
+  const ms = EXPIRATION_MS.get(value);
+  if (!ms) throw new Error(`Unknown expiration option: ${value}`);
+  return ms;
+}
+
 /**
  * Human-friendly "time remaining" string, e.g. "17 hours", "42 minutes",
  * "less than a minute". Returns null once the deadline has passed.

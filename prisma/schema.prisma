@@ -27,6 +27,15 @@ model Drop {
   /// Never expose the internal `id` or storage keys to clients.
   shareId String @unique
 
+  /// Capability token shown to the uploader once, at creation time —
+  /// proves "I'm the one who made this" well enough to let them delete it
+  /// early (see DELETE /api/share/[shareId]), without needing accounts.
+  /// Plaintext by design: it's a random, high-entropy secret like
+  /// shareId, not a reusable password — nothing meaningful is gained by
+  /// hashing it, and a plaintext compare stays constant-time at the
+  /// call site instead.
+  deleteToken String @unique
+
   /// Optional bcrypt hash. Never store the plaintext password.
   passwordHash String?
 

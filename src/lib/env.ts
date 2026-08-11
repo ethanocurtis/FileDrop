@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { EXPIRATION_OPTIONS, type ExpirationValue } from "@/lib/utils/time";
+
+const expirationValues = EXPIRATION_OPTIONS.map((o) => o.value) as [
+  ExpirationValue,
+  ...ExpirationValue[],
+];
 
 /**
  * Centralized, validated environment configuration. Importing from here
@@ -37,6 +43,18 @@ const envSchema = z.object({
     .default("10")
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().positive().max(100)),
+
+  // Files at or over this size get their expiration capped to
+  // LARGE_FILE_MAX_EXPIRATION regardless of what the uploader picked —
+  // see prepareDrop() in src/lib/uploads/service.ts. Doesn't apply to
+  // peer-to-peer transfers, which never touch server storage in the
+  // first place. Default: 1 GB / 24 hours.
+  LARGE_FILE_THRESHOLD_BYTES: z
+    .string()
+    .default("1073741824")
+    .transform((v) => Number.parseInt(v, 10))
+    .pipe(z.number().int().positive()),
+  LARGE_FILE_MAX_EXPIRATION: z.enum(expirationValues).default("24h"),
 
   // Peer-to-peer transfers work without these (best-effort, direct
   // connections only) — a TURN relay is only needed as a fallback when

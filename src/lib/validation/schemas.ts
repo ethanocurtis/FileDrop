@@ -34,6 +34,10 @@ export const unlockDropSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
+export const deleteDropSchema = z.object({
+  deleteToken: z.string().min(1).max(200),
+});
+
 // Generous sanity cap, not a real storage limit — the server never stores
 // or streams these bytes, so there's no MAX_UPLOAD_SIZE_BYTES-style
 // resource concern. This just keeps garbage/negative values out of the

@@ -43,6 +43,9 @@ export function UploadFlow() {
     files: UploadedFileSummary[];
     expiresAt: Date;
     shareUrl: string;
+    shareId: string;
+    deleteToken: string;
+    expirationClamped: boolean;
   } | null>(null);
 
   const activeUploads = useRef<Map<string, ActiveUpload>>(new Map());
@@ -171,6 +174,9 @@ export function UploadFlow() {
     setPendingFiles([]);
     setSuccessData({
       shareUrl: created.shareUrl,
+      shareId: created.shareId,
+      deleteToken: created.deleteToken,
+      expirationClamped: created.expirationClamped,
       expiresAt: new Date(created.expiresAt),
       files: succeeded.map((r) => ({
         name: r.value.target.name,
@@ -213,6 +219,9 @@ export function UploadFlow() {
         files={successData.files}
         expiresAt={successData.expiresAt}
         shareUrl={successData.shareUrl}
+        shareId={successData.shareId}
+        deleteToken={successData.deleteToken}
+        expirationClamped={successData.expirationClamped}
         onReset={handleReset}
       />
     );

@@ -121,6 +121,17 @@ export async function unlockDrop(
   return res.json();
 }
 
+/** Deletes a drop early using the capability token shown once at
+ * creation time (see CreateDropResponse.deleteToken). */
+export async function deleteDrop(shareId: string, deleteToken: string): Promise<void> {
+  const res = await fetch(`/api/share/${shareId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deleteToken }),
+  });
+  if (!res.ok) throw await parseErrorBody(res);
+}
+
 /**
  * Downloads a file via fetch + Blob (rather than a plain navigation) so
  * failures surface as catchable errors in the UI instead of the browser

@@ -40,7 +40,9 @@ export async function POST(request: Request) {
     const response: CreateDropResponse = {
       shareId: drop.shareId,
       dropId: drop.dropId,
+      deleteToken: drop.deleteToken,
       expiresAt: drop.expiresAt.toISOString(),
+      expirationClamped: drop.expirationClamped,
       shareUrl: `${origin}/f/${drop.shareId}`,
       files: drop.files.map((f) => ({
         fileId: f.fileId,

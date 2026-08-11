@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { generateShareId } from "@/lib/security/ids";
+import { generateDeleteToken, generateShareId } from "@/lib/security/ids";
 import type { DropStatus, P2pStatus } from "@/generated/prisma";
 
 /**
@@ -16,15 +16,18 @@ export async function createTestDrop(overrides: {
   downloadCount?: number;
   burnAfterRead?: boolean;
   fileStatus?: DropStatus;
+  deleteToken?: string;
 } = {}) {
   const dropId = randomUUID();
   const fileId = randomUUID();
   const shareId = generateShareId();
+  const deleteToken = overrides.deleteToken ?? generateDeleteToken();
 
   const drop = await prisma.drop.create({
     data: {
       id: dropId,
       shareId,
+      deleteToken,
       status: overrides.status ?? "ACTIVE",
       expiresAt: overrides.expiresAt ?? new Date(Date.now() + 60 * 60 * 1000),
       passwordHash: overrides.passwordHash ?? null,
@@ -46,7 +49,7 @@ export async function createTestDrop(overrides: {
     include: { files: true },
   });
 
-  return { drop, shareId, dropId, fileId };
+  return { drop, shareId, dropId, fileId, deleteToken };
 }
 
 /** Insert a P2pTransfer directly via Prisma — same bypass-the-real-flow
