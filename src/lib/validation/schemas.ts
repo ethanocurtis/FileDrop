@@ -33,3 +33,21 @@ export const createDropSchema = z.object({
 export const unlockDropSchema = z.object({
   password: z.string().min(1).max(200),
 });
+
+// Generous sanity cap, not a real storage limit — the server never stores
+// or streams these bytes, so there's no MAX_UPLOAD_SIZE_BYTES-style
+// resource concern. This just keeps garbage/negative values out of the
+// database row.
+const MAX_P2P_FILE_SIZE_BYTES = 20 * 1024 * 1024 * 1024; // 20 GB
+
+export const createP2pTransferSchema = z.object({
+  fileName: z.string().min(1).max(500),
+  fileSize: z.number().int().positive().max(MAX_P2P_FILE_SIZE_BYTES),
+  mimeType: z.string().max(255).optional().default("application/octet-stream"),
+  expiration: z.enum(expirationValues),
+  password: z.string().min(1).max(200).optional(),
+});
+
+export const unlockP2pTransferSchema = z.object({
+  password: z.string().min(1).max(200),
+});

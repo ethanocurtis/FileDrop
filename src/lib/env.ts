@@ -37,6 +37,30 @@ const envSchema = z.object({
     .default("10")
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().positive().max(100)),
+
+  // Peer-to-peer transfers work without these (best-effort, direct
+  // connections only) — a TURN relay is only needed as a fallback when
+  // two browsers can't reach each other directly (restrictive NATs /
+  // firewalls). Both left unset just means getIceServers() returns STUN
+  // only. See README "Peer-to-peer transfers".
+  // docker-compose.yml passes these as `${TURN_SECRET:-}` — an empty
+  // string when unset, not an absent key — so they need to be normalized
+  // to undefined before `.optional()` can treat them as "not configured".
+  // Without this, an intentionally-blank TURN_SECRET would fail the
+  // `.min(16)` check and crash the app on startup.
+  TURN_SECRET: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(16).optional(),
+  ),
+  TURN_EXTERNAL_IP: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  TURN_PORT: z
+    .string()
+    .default("3478")
+    .transform((v) => Number.parseInt(v, 10))
+    .pipe(z.number().int().positive()),
 });
 
 function loadEnv() {

@@ -65,6 +65,10 @@ COPY --from=builder --chown=filedrop:filedrop /app/public ./public
 COPY --from=builder --chown=filedrop:filedrop /app/package.json ./package.json
 COPY --from=builder --chown=filedrop:filedrop /app/next.config.ts ./next.config.ts
 COPY --from=builder --chown=filedrop:filedrop /app/tsconfig.json ./tsconfig.json
+# `npm run start` runs this via tsx (see package.json) instead of plain
+# `next start`, so the WebRTC signaling WebSocket server can attach to the
+# same HTTP server/port — see server.ts and src/lib/p2p/signalingServer.ts.
+COPY --from=builder --chown=filedrop:filedrop /app/server.ts ./server.ts
 COPY --from=builder --chown=filedrop:filedrop /app/prisma ./prisma
 COPY --from=builder --chown=filedrop:filedrop /app/scripts ./scripts
 # `npm run cleanup` (used by the `cleanup` compose service) runs

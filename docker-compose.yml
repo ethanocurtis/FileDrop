@@ -77,6 +77,13 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-209715200}
       MAX_FILES_PER_DROP: ${MAX_FILES_PER_DROP:-10}
+      # Optional — peer-to-peer transfers work without these (direct
+      # connections only). Only needed if you've enabled the coturn
+      # service below. Left blank (the default) rather than unset, so this
+      # file parses cleanly whether or not you use P2P at all.
+      TURN_SECRET: ${TURN_SECRET:-}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+      TURN_PORT: ${TURN_PORT:-3478}
     ports:
       # Host port is configurable via APP_PORT in .env.docker (default
       # 3000) in case something else on the host already owns it. The
@@ -120,6 +127,35 @@ services:
         sleep 900;
       done
       "
+
+  # Optional TURN relay for WebRTC peer-to-peer transfers, used as a
+  # fallback when a direct connection between two browsers can't be
+  # established (restrictive NATs/firewalls). Not started by default —
+  # requires the "p2p-turn" Compose profile:
+  #   docker compose --profile p2p-turn --env-file .env.docker up -d
+  # See README "Peer-to-peer transfers" for the TURN_SECRET/
+  # TURN_EXTERNAL_IP setup this needs.
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    profiles:
+      - p2p-turn
+    command: >
+      -n --log-file=stdout
+      --listening-port=3478
+      --min-port=${TURN_MIN_PORT:-49160}
+      --max-port=${TURN_MAX_PORT:-49200}
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET:-changeme-set-a-real-turn-secret}
+      --realm=${TURN_REALM:-filedrop}
+      --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}
+      --no-cli
+      --no-tls
+      --no-dtls
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}:${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}/udp"
 
 volumes:
   postgres-data:

@@ -84,3 +84,43 @@ model UploadFile {
   @@index([dropId])
   @@index([storageKey])
 }
+
+enum P2pStatus {
+  WAITING // link created, no peer has connected yet
+  CONNECTED // both sender and receiver are present in the signaling room
+  COMPLETED // receiver reported the transfer finished
+  EXPIRED // past expiresAt, or the room was closed
+}
+
+/// A direct browser-to-browser transfer: the file itself is never uploaded
+/// to or stored by the server — only this small metadata row exists here,
+/// and the signaling server (see src/lib/p2p/signalingServer.ts) relays
+/// the WebRTC handshake between the two browsers in memory. There is no
+/// object-storage cleanup for these, unlike Drop/UploadFile.
+model P2pTransfer {
+  id String @id @default(cuid())
+
+  /// Public, unguessable identifier used in share URLs (/p2p/{shareId})
+  /// and as the signaling room key.
+  shareId String @unique
+
+  /// Declared by the sender at link-creation time, before any peer has
+  /// connected — sanitized the same way as server-stored file names.
+  fileName String
+  fileSize BigInt
+  mimeType String
+
+  /// Optional bcrypt hash, gating the signaling handshake itself (a
+  /// receiver can't exchange SDP/ICE with the sender without it) — never
+  /// stored in plaintext.
+  passwordHash String?
+
+  status P2pStatus @default(WAITING)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([shareId])
+  @@index([expiresAt])
+  @@index([status])
+}

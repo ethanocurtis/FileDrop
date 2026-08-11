@@ -68,6 +68,7 @@ export const uploadRateLimiter: RateLimiter = new InMemoryRateLimiter(20, 60 * 6
 export const downloadRateLimiter: RateLimiter = new InMemoryRateLimiter(60, 10 * 60 * 1000); // 60 downloads / 10 min / IP
 export const passwordAttemptRateLimiter: RateLimiter = new InMemoryRateLimiter(10, 10 * 60 * 1000); // 10 password guesses / 10 min / IP+drop
 export const metadataRateLimiter: RateLimiter = new InMemoryRateLimiter(120, 10 * 60 * 1000); // 120 lookups / 10 min / IP
+export const p2pSignalRateLimiter: RateLimiter = new InMemoryRateLimiter(30, 10 * 60 * 1000); // 30 signaling connection attempts / 10 min / IP
 
 /** Best-effort client IP extraction behind common reverse proxies. */
 export function getClientIp(request: Request): string {
@@ -76,6 +77,26 @@ export function getClientIp(request: Request): string {
 
   const realIp = request.headers.get("x-real-ip");
   if (realIp) return realIp.trim();
+
+  return "unknown";
+}
+
+/** Same idea as {@link getClientIp}, but for raw Node `IncomingMessage`
+ * headers — needed for the WebSocket upgrade path, which happens before
+ * Next.js (and its Fetch API `Request`) ever sees the connection. */
+export function getClientIpFromNodeHeaders(
+  headers: Record<string, string | string[] | undefined>,
+): string {
+  const forwardedFor = headers["x-forwarded-for"];
+  if (forwardedFor) {
+    const value = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    return value.split(",")[0].trim();
+  }
+
+  const realIp = headers["x-real-ip"];
+  if (realIp) {
+    return (Array.isArray(realIp) ? realIp[0] : realIp).trim();
+  }
 
   return "unknown";
 }
