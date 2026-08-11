@@ -28,7 +28,15 @@ import {
 // processed at least one real request), racing our own upgrade handler
 // even though we claim the socket first. Keeping this path outside /api/
 // avoids that entirely.
-const SIGNAL_PATH = "/ws/p2p/signal";
+export const SIGNAL_PATH = "/ws/p2p/signal";
+
+/** Used by server.ts to decide whether to also offer an upgrade request
+ * to Next's own handler (needed for its dev-mode HMR websocket) — never
+ * for our own path, so Next's /api/*-upgrade defensiveness (see above)
+ * never gets a chance to race our already-claimed socket. */
+export function isSignalPath(pathname: string): boolean {
+  return pathname === SIGNAL_PATH;
+}
 
 interface Room {
   sender?: WebSocket;
@@ -51,12 +59,16 @@ export function attachSignalingServer(httpServer: HttpServer): void {
     try {
       url = new URL(req.url ?? "", "http://internal");
     } catch {
-      socket.destroy();
       return;
     }
 
+    // Anything that isn't ours is left alone rather than rejected — in
+    // particular Next.js's own dev-mode HMR websocket (/_next/webpack-hmr)
+    // needs to reach *its* upgrade handler too. server.ts registers that
+    // as a separate 'upgrade' listener; Node calls every listener for the
+    // same event, so returning here just declines to act, it doesn't
+    // block the other listener from claiming the socket.
     if (url.pathname !== SIGNAL_PATH) {
-      rejectUpgrade(socket, 404, "Not Found");
       return;
     }
 
