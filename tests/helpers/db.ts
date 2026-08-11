@@ -5,4 +5,5 @@ import { prisma } from "@/lib/prisma";
 export async function resetDatabase(): Promise<void> {
   await prisma.uploadFile.deleteMany();
   await prisma.drop.deleteMany();
+  await prisma.p2pTransfer.deleteMany();
 }

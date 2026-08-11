@@ -6,6 +6,7 @@ export interface CleanupResult {
   filesDeleted: number;
   dropsMarkedDeleted: number;
   errors: number;
+  p2pTransfersDeleted: number;
 }
 
 const BATCH_SIZE = 100;
@@ -28,6 +29,7 @@ export async function runCleanup(): Promise<CleanupResult> {
     filesDeleted: 0,
     dropsMarkedDeleted: 0,
     errors: 0,
+    p2pTransfersDeleted: 0,
   };
 
   // First, lazily expire anything past its deadline that cleanup hasn't
@@ -86,6 +88,17 @@ export async function runCleanup(): Promise<CleanupResult> {
 
     if (batch.length < BATCH_SIZE) break;
   }
+
+  // P2pTransfer rows never have an associated storage object — the file
+  // itself is never uploaded anywhere (see prisma/schema.prisma) — so
+  // unlike Drop there's nothing to delete before the row itself, and no
+  // reason to keep an expired row around (getActiveP2pTransferByShareId
+  // already treats anything past expiresAt as gone, same generic
+  // "not found" either way). A plain hard delete is enough.
+  const deletedTransfers = await prisma.p2pTransfer.deleteMany({
+    where: { expiresAt: { lte: new Date() } },
+  });
+  result.p2pTransfersDeleted = deletedTransfers.count;
 
   return result;
 }

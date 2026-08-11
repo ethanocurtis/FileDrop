@@ -18,7 +18,8 @@ async function main() {
 
   console.log(
     `[cleanup] examined=${result.dropsExamined} filesDeleted=${result.filesDeleted} ` +
-      `dropsMarkedDeleted=${result.dropsMarkedDeleted} errors=${result.errors} (${durationMs}ms)`,
+      `dropsMarkedDeleted=${result.dropsMarkedDeleted} errors=${result.errors} ` +
+      `p2pTransfersDeleted=${result.p2pTransfersDeleted} (${durationMs}ms)`,
   );
 
   if (result.errors > 0) {

@@ -1,7 +1,15 @@
 # FileDrop
 
 FileDrop is a temporary file-sharing service. Drop a file, get a link, the
-link expires and the file is gone — no account required.
+link expires and the file is gone — no account required. Two ways to send:
+
+- **Upload** — the file is stored (temporarily) on the server, so the
+  sender doesn't need to stay online for the receiver to download it.
+- **Peer-to-peer** — the file goes straight from the sender's browser to
+  the receiver's over WebRTC, never touching server storage. Good for
+  large files or anything you'd rather not have land on a server, at the
+  cost of both browsers needing to be online at the same time. See
+  "Peer-to-peer transfers" below.
 
 ```
 Upload → Store → Generate Link → Open Link → Download → Expire → Delete
@@ -12,8 +20,11 @@ Upload → Store → Generate Link → Open Link → Download → Expire → Del
 - **Next.js (App Router) + TypeScript** — UI and server-side API routes
 - **Tailwind CSS** — dark-mode UI
 - **PostgreSQL + Prisma** — metadata storage
-- **S3-compatible object storage** — file bytes (AWS S3, MinIO, Cloudflare R2,
-  Backblaze B2, DigitalOcean Spaces, ...)
+- **S3-compatible object storage** — file bytes for the upload flow (AWS S3,
+  MinIO, Cloudflare R2, Backblaze B2, DigitalOcean Spaces, ...)
+- **WebRTC + a small custom WebSocket signaling server** — peer-to-peer
+  transfers (`server.ts`, `src/lib/p2p/`); optionally **coturn** as a TURN
+  relay fallback for restrictive NATs/firewalls
 - **Vitest** — unit/integration tests
 
 ## How it works
@@ -40,22 +51,81 @@ Upload → Store → Generate Link → Open Link → Download → Expire → Del
 5. A cleanup job (see below) — and a lazy check on every link visit —
    deletes anything past its expiration.
 
+## Peer-to-peer transfers
+
+The `/p2p` tab is a second, independent way to send a file — it never
+touches object storage, and the server only ever sees a small metadata
+row (file name/size/MIME type, optional password hash, expiry) plus the
+WebRTC handshake, not the file itself.
+
+1. The sender picks a file at `/p2p`, sets an expiration and optional
+   password, and `POST /api/p2p` creates that metadata row and returns a
+   share link (`/p2p/{shareId}`) — same random-ID scheme as the upload
+   flow.
+2. Both browsers open a WebSocket to `/ws/p2p/signal` (a custom server —
+   see `server.ts` — since plain Next.js route handlers can't hold a
+   WebSocket connection open). This signaling server relays only the
+   small SDP offer/answer and ICE candidates two `RTCPeerConnection`s
+   need to find each other; it never sees file bytes and holds nothing
+   in a database — rooms are in-memory, keyed by `shareId`, and hold at
+   most one sender and one receiver.
+3. Once connected, the file streams directly browser-to-browser over an
+   `RTCDataChannel`, in 64KB chunks with backpressure (see
+   `src/lib/p2p/client/webrtc.ts`). The receiver writes it straight to
+   disk via the File System Access API when the browser supports it
+   (Chrome/Edge), or buffers it in memory and triggers a normal download
+   otherwise (Firefox, Safari).
+4. **Both tabs need to stay open for the whole transfer** — there's
+   nothing on the server to resume from if either side closes early. If
+   the receiver's tab reconnects (a network blip, not a full close), the
+   sender automatically re-offers and the transfer can pick back up
+   without a page reload.
+
+By default, the two browsers try to connect directly, using only a
+public STUN server to discover their own reachable address — this works
+on most networks. Some NATs/firewalls block direct peer connections
+entirely, in which case a TURN relay is the only way through. FileDrop
+can use your own **coturn** instance for this:
+
+- Not required — P2P works without it on most networks; it's a fallback
+  for the networks where a direct connection isn't possible.
+- Configure `TURN_SECRET`/`TURN_EXTERNAL_IP` (running directly — see
+  "Configuration reference") or the same variables in `.env.docker`
+  (running via Docker Compose — see "Running with Docker").
+- Ephemeral credentials are minted per-connection using coturn's
+  standard "TURN REST API" convention (HMAC-SHA1 over a timestamp,
+  10-minute TTL) — see `src/lib/p2p/turnCredentials.ts`. Nothing is
+  persisted; coturn verifies these itself by recomputing the same HMAC.
+
+**Running behind a reverse proxy?** `/ws/p2p/signal` is a WebSocket
+endpoint on the same host/port as the rest of the app — make sure your
+proxy forwards `Upgrade`/`Connection` headers for it. Nginx Proxy
+Manager does this automatically as long as **Websockets Support** is
+enabled on the Proxy Host (Details tab) — the same proxy host you
+already set up for the rest of the app covers this too, no separate host
+needed.
+
 ## Project structure
 
 ```
-prisma/schema.prisma        Drop + UploadFile models, indexes on shareId/expiresAt
+prisma/schema.prisma        Drop + UploadFile + P2pTransfer models
+server.ts                   Custom server (Next.js + the P2P signaling WebSocket on one port)
 src/
   app/
     page.tsx                Homepage (upload)
     f/[shareId]/page.tsx     Download page (server-checks expiration before rendering)
+    p2p/page.tsx             Peer-to-peer send flow
+    p2p/[shareId]/page.tsx    Peer-to-peer receive flow
     api/
       drops/                 Create a drop, stream file bytes to storage
       share/[shareId]/        Metadata, password unlock, download
+      p2p/                     Create/fetch/unlock a P2P transfer, ICE server config
       cleanup/                 Cron-triggered expiry sweep (bearer-token protected)
   components/
-    ui/                      Logo, Button, Card, CopyButton, QrCode, FileIcon
+    ui/                      Logo, Button, Card, CopyButton, QrCode, FileIcon, ProgressBar
     upload/                  Dropzone, expiration picker, options panel, progress, success screen
     download/                Password gate, download card, expired state
+    p2p/                     Mode tabs, review step, status panel, send/receive flows
   lib/
     prisma.ts                Prisma client singleton
     env.ts                   Validated environment config (zod)
@@ -63,6 +133,8 @@ src/
     validation/               Filename sanitization, size/type checks, zod request schemas
     security/                Share ID generation, password hashing, rate limiting, download tokens, scan() stub
     uploads/                  Drop creation, upload completion, atomic download claims
+    p2p/                     Signaling server, TURN credentials, transfer metadata service
+    p2p/client/               Browser-side WebRTC transfer engine + File System Access/Blob sinks
     cleanup/cleanup.ts        Idempotent expiry sweep, reused by the API route and the CLI script
     utils/                    Byte/time formatting, BigInt-safe JSON serialization
 scripts/
@@ -70,7 +142,7 @@ scripts/
   dev-s3.mjs                 Local S3-compatible mock server for development
 tests/                        Vitest unit + integration tests
 Dockerfile                    Multi-stage production image (see "Running with Docker")
-docker-compose.yml            App + Postgres + MinIO + a scheduled cleanup container
+docker-compose.yml            App + Postgres + MinIO + a scheduled cleanup container + optional coturn
 docker-compose.override.yml.example  Template for deployment-specific tweaks (e.g. reverse-proxy network)
 docker/entrypoint.sh          Runs `prisma migrate deploy` before the app/cleanup command
 ```
@@ -111,8 +183,8 @@ createdb filedrop   # or: CREATE DATABASE filedrop; via psql
 npx prisma migrate dev
 ```
 
-`npx prisma studio` gives you a quick GUI over the two tables (`Drop`,
-`UploadFile`) if you want to poke at the data directly.
+`npx prisma studio` gives you a quick GUI over the tables (`Drop`,
+`UploadFile`, `P2pTransfer`) if you want to poke at the data directly.
 
 ### 4. Object storage configuration
 
@@ -222,6 +294,25 @@ using the regular `.env` (from `.env.example`) pointed at your external
 database/bucket. The container still runs `prisma migrate deploy` on
 startup either way.
 
+### Optional: TURN relay for peer-to-peer transfers
+
+Peer-to-peer transfers work without this — it's only a fallback for
+networks where two browsers can't establish a direct connection (see
+"Peer-to-peer transfers" above). To run your own relay, set
+`TURN_SECRET` and `TURN_EXTERNAL_IP` (the VM's public IP) in
+`.env.docker`, then start compose with the `p2p-turn` profile so the
+bundled `coturn` service actually starts:
+
+```bash
+docker compose --profile p2p-turn --env-file .env.docker up -d
+```
+
+This publishes `3478/udp`, `3478/tcp`, and a UDP relay port range
+(`49160-49200` by default, configurable via `TURN_MIN_PORT`/
+`TURN_MAX_PORT` in `.env.docker`) — open those in any firewall/security
+group in front of the VM, in addition to whatever you already opened for
+the app itself.
+
 ### Running behind a Docker-based reverse proxy
 
 If your reverse proxy also runs in Docker — Nginx Proxy Manager, Traefik,
@@ -290,15 +381,18 @@ plain Linux Docker Engine).
    ```
 
    (matching, with headroom, whatever `MAX_UPLOAD_SIZE_BYTES` is set to).
+   Also turn on **Websockets Support** on the Details tab — needed for
+   peer-to-peer transfers' signaling connection (`/ws/p2p/signal`); the
+   rest of the app works fine without it, but P2P won't.
 
 ## Development scripts
 
 | Command              | What it does                                             |
 | --------------------- | ---------------------------------------------------------- |
-| `npm run dev`          | Start the dev server                                       |
+| `npm run dev`          | Start the dev server (`server.ts` — Next.js + the P2P signaling WebSocket) |
 | `npm run dev:s3`       | Start the local S3-compatible mock (development only)      |
 | `npm run build`        | Production build                                            |
-| `npm run start`        | Run the production build                                    |
+| `npm run start`        | Run the production build (`server.ts`, same as above)       |
 | `npm run lint`         | ESLint                                                       |
 | `npm test`             | Run the test suite once                                     |
 | `npm run test:watch`   | Run tests in watch mode                                     |
@@ -342,6 +436,10 @@ drop only flips to `DELETED` after every one of its storage objects is
 confirmed deleted, and repeat deletes of an already-gone object are a
 no-op, so a partial failure just gets retried next run.
 
+The same sweep also hard-deletes expired `P2pTransfer` rows — there's no
+storage object to worry about there (the file was never uploaded
+anywhere), just the small metadata row itself.
+
 ## Security notes
 
 - Share IDs are generated with `crypto.randomBytes` (~128 bits of entropy)
@@ -367,6 +465,17 @@ no-op, so a partial failure just gets retried next run.
 - `src/lib/security/scan.ts` is a deliberate no-op extension point for
   wiring in real malware/content scanning later without touching call
   sites.
+- The above all applies to peer-to-peer transfers too, where relevant:
+  passwords are bcrypt-hashed, the signaling WebSocket is rate-limited
+  by IP (`p2pSignalRateLimiter`), and a password-protected transfer's
+  signaling connection requires the same short-lived HMAC token used to
+  gate downloads on the upload flow (issued after a correct password
+  check, verified on WebSocket upgrade — see
+  `src/lib/p2p/signalingServer.ts`). The signaling server itself never
+  sees file bytes, only the SDP/ICE handshake, and holds no database
+  state of its own — an unauthorized or expired connection is closed
+  with a specific WebSocket close code rather than ever being handed a
+  live signaling session.
 
 ## Testing
 
@@ -378,19 +487,34 @@ npm test
 
 Tests cover share ID generation, filename sanitization, file-size/type
 validation, password hashing, download-token signing, expiration checks
-(including a concurrency test proving download limits can't be raced), and
-cleanup idempotency. Integration tests use a real Postgres database
-(pointed at by `TEST_DATABASE_URL`, falling back to
+(including a concurrency test proving download limits can't be raced),
+cleanup idempotency (for both the upload flow and peer-to-peer
+transfers), the P2P transfer metadata service (creation, expiry,
+password unlock, authorized-vs-not response shape), and TURN credential
+generation. Integration tests use a real Postgres database (pointed at
+by `TEST_DATABASE_URL`, falling back to
 `postgresql://filedrop:filedrop@localhost:5432/filedrop_test`) and mock
 object storage, so they don't require a running S3 endpoint.
+
+The signaling WebSocket and the actual WebRTC data channel aren't
+covered by the Vitest suite (they need two real browsers, not just a
+Node test runner) — those were verified with real two-browser Playwright
+sessions during development, confirming an end-to-end transfer's bytes
+match exactly (SHA-256) on both the plain and password-protected paths.
 
 ## Configuration reference
 
 See `.env.example` for the full list. Notable ones:
 
 - `MAX_UPLOAD_SIZE_BYTES` — hard per-file size cap, enforced server-side
-  regardless of what the client claims (default 200 MB).
+  regardless of what the client claims (default 200 MB). Doesn't apply
+  to peer-to-peer transfers — those never touch server storage.
 - `MAX_FILES_PER_DROP` — cap on files in a single drop (default 10).
+- `TURN_SECRET` / `TURN_EXTERNAL_IP` / `TURN_PORT` — optional, enable a
+  TURN relay fallback for peer-to-peer transfers (see "Peer-to-peer
+  transfers" above). Both `TURN_SECRET` and `TURN_EXTERNAL_IP` need to be
+  set for TURN to activate; leaving them unset just means
+  `getIceServers()` returns the public STUN server only.
 
 ## Deploying
 

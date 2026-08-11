@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { resetDatabase } from "./helpers/db";
-import { createTestDrop } from "./helpers/fixtures";
+import { createTestDrop, createTestP2pTransfer } from "./helpers/fixtures";
 
 const deleteObject = vi.fn<(key: string) => Promise<void>>(async () => {});
 
@@ -126,5 +126,34 @@ describe("runCleanup", () => {
     const p = await prisma.drop.findUniqueOrThrow({ where: { id: pending.dropId } });
     expect(a.status).toBe("DELETED");
     expect(p.status).toBe("PENDING");
+  });
+
+  it("hard-deletes P2pTransfer rows past their expiry, regardless of status", async () => {
+    const { shareId: expiredWaiting } = await createTestP2pTransfer({
+      status: "WAITING",
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    const { shareId: expiredCompleted } = await createTestP2pTransfer({
+      status: "COMPLETED",
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    const { shareId: stillActive } = await createTestP2pTransfer({
+      status: "WAITING",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    });
+
+    const result = await runCleanup();
+    expect(result.p2pTransfersDeleted).toBe(2);
+
+    expect(await prisma.p2pTransfer.findUnique({ where: { shareId: expiredWaiting } })).toBeNull();
+    expect(await prisma.p2pTransfer.findUnique({ where: { shareId: expiredCompleted } })).toBeNull();
+    expect(await prisma.p2pTransfer.findUnique({ where: { shareId: stillActive } })).not.toBeNull();
+  });
+
+  it("is a no-op for P2pTransfer when nothing has expired", async () => {
+    await createTestP2pTransfer({ expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
+
+    const result = await runCleanup();
+    expect(result.p2pTransfersDeleted).toBe(0);
   });
 });

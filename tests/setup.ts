@@ -19,3 +19,8 @@ process.env.S3_SECRET_ACCESS_KEY ??= "S3RVER";
 process.env.S3_FORCE_PATH_STYLE ??= "true";
 process.env.DOWNLOAD_TOKEN_SECRET ??= "test-download-token-secret-not-for-production";
 process.env.CLEANUP_SECRET ??= "test-cleanup-secret-not-for-production";
+// Set so tests can exercise the TURN-configured branch of getIceServers()
+// (see tests/turn-credentials.test.ts) — no real coturn instance needed,
+// it's a pure HMAC credential-generation function.
+process.env.TURN_SECRET ??= "test-turn-secret-not-for-production";
+process.env.TURN_EXTERNAL_IP ??= "203.0.113.10"; // TEST-NET-3, RFC 5737
