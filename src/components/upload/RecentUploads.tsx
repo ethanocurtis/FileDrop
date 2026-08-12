@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Trash2, X } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { deleteDrop, ApiError } from "@/lib/client/api";
@@ -115,14 +115,6 @@ export function RecentUploads() {
                       aria-label="Delete now"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeRecentUpload(entry.shareId)}
-                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-card hover:text-foreground cursor-pointer"
-                      aria-label="Remove from this list"
-                    >
-                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 )}

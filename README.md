@@ -70,9 +70,11 @@ few drops — link, expiry, delete token — entirely in this browser's
 sent to or known by the server beyond what it already tracks for the
 drop itself; it's just how the delete-token above stays usable after you
 navigate away, and a quick way to re-copy a link or check what's still
-live. Each entry drops off the list on its own once it expires, and
-"remove from this list" just forgets it locally — it doesn't delete the
-actual drop (use "Delete Now" for that).
+live. Each entry drops off the list on its own once it expires. There's
+deliberately no "just hide this" action — every entry here is either
+something you can still manage or something you've actually deleted, so
+you're never left with a link that's quietly still live with no way to
+get back to it.
 
 **Large files get a shorter expiration automatically.** A file at or over
 `LARGE_FILE_THRESHOLD_BYTES` (default 1 GB) has its expiration capped to
