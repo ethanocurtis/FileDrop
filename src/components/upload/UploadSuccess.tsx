@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Info, RotateCcw, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Info, RotateCcw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { QrCode } from "@/components/ui/QrCode";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { deleteDrop, ApiError } from "@/lib/client/api";
+import { useAutoCopyOnMount } from "@/lib/client/clipboard";
+import { removeRecentUpload } from "@/lib/client/recentUploads";
 import { formatBytes } from "@/lib/utils/bytes";
 import { formatAbsolute } from "@/lib/utils/time";
 
@@ -38,12 +40,14 @@ export function UploadSuccess({
   const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const autoCopied = useAutoCopyOnMount(shareUrl);
 
   async function handleConfirmDelete() {
     setDeleting(true);
     setDeleteError(null);
     try {
       await deleteDrop(shareId, deleteToken);
+      removeRecentUpload(shareId);
       setDeleted(true);
     } catch (err) {
       setDeleteError(err instanceof ApiError ? err.message : "Could not delete this drop.");
@@ -124,6 +128,11 @@ export function UploadSuccess({
           <div className="mt-4 flex gap-2">
             <CopyButton value={shareUrl} className="flex-1 sm:flex-none" />
           </div>
+          {autoCopied && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-success animate-fade-in">
+              <Check className="h-3.5 w-3.5" /> Already copied to your clipboard
+            </p>
+          )}
         </div>
 
         <QrCode value={shareUrl} size={132} />

@@ -1,6 +1,7 @@
 import { Logo } from "@/components/ui/Logo";
 import { ModeTabs } from "@/components/p2p/ModeTabs";
 import { UploadFlow } from "@/components/upload/UploadFlow";
+import { RecentUploads } from "@/components/upload/RecentUploads";
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
         </div>
 
         <UploadFlow />
+        <RecentUploads />
       </main>
 
       <footer className="mx-auto w-full max-w-3xl px-6 pb-8 text-center text-xs text-muted-foreground">

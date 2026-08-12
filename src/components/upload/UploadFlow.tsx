@@ -10,6 +10,7 @@ import { UploadSuccess, type UploadedFileSummary } from "@/components/upload/Upl
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { createDrop, uploadFileContent, cancelUploadSession, ApiError } from "@/lib/client/api";
+import { addRecentUpload } from "@/lib/client/recentUploads";
 import { DEFAULT_EXPIRATION, type ExpirationValue } from "@/lib/utils/time";
 import { formatBytes } from "@/lib/utils/bytes";
 import type { CreateDropResponseFile } from "@/types/drop";
@@ -185,6 +186,15 @@ export function UploadFlow() {
       })),
     });
     setPhase("success");
+
+    addRecentUpload({
+      shareId: created.shareId,
+      shareUrl: created.shareUrl,
+      deleteToken: created.deleteToken,
+      fileNames: succeeded.map((r) => r.value.target.name),
+      createdAt: new Date().toISOString(),
+      expiresAt: created.expiresAt,
+    });
   }, [pendingFiles, expiration, options, updateEntry]);
 
   const handleCancel = useCallback(

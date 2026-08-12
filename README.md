@@ -52,13 +52,27 @@ Upload → Store → Generate Link → Open Link → Download → Expire → Del
    deletes anything past its expiration.
 
 **Deleting early.** There are no accounts, so the only proof that you're
-the one who created a drop is a capability token (`deleteToken`) shown
-once, right on the success screen, after upload — a "Delete Now" button
-right there uses it immediately via `DELETE /api/share/:shareId`, no need
-to copy or save it anywhere. Refresh the page or come back later and
-it's gone from view — same trade-off as everything else here (no
-accounts, nothing persisted client-side), so use it in the moment if you
-need it.
+the one who created a drop is a capability token (`deleteToken`) issued
+once, at upload time — a "Delete Now" button on the success screen uses
+it immediately via `DELETE /api/share/:shareId`. The browser also
+remembers it (see "Recent uploads" below), so deleting isn't only
+possible in the ten seconds right after uploading.
+
+**The link is copied for you automatically**, the moment it's created —
+on both the upload and peer-to-peer success screens — so there's usually
+nothing to click before pasting it somewhere. The manual Copy Link
+button is still there too, since the Clipboard API can silently fail to
+auto-copy depending on browser/permission context.
+
+**Recent uploads.** The homepage keeps a small local history of your last
+few drops — link, expiry, delete token — entirely in this browser's
+`localStorage` (see `src/lib/client/recentUploads.ts`). Nothing here is
+sent to or known by the server beyond what it already tracks for the
+drop itself; it's just how the delete-token above stays usable after you
+navigate away, and a quick way to re-copy a link or check what's still
+live. Each entry drops off the list on its own once it expires, and
+"remove from this list" just forgets it locally — it doesn't delete the
+actual drop (use "Delete Now" for that).
 
 **Large files get a shorter expiration automatically.** A file at or over
 `LARGE_FILE_THRESHOLD_BYTES` (default 1 GB) has its expiration capped to
@@ -144,7 +158,7 @@ src/
       cleanup/                 Cron-triggered expiry sweep (bearer-token protected)
   components/
     ui/                      Logo, Button, Card, CopyButton, QrCode, FileIcon, ProgressBar
-    upload/                  Dropzone, expiration picker, options panel, progress, success screen
+    upload/                  Dropzone, expiration picker, options panel, progress, success screen, recent-uploads panel
     download/                Password gate, download card, expired state
     p2p/                     Mode tabs, review step, status panel, send/receive flows
   lib/
@@ -153,6 +167,7 @@ src/
     storage/s3.ts            S3-compatible client wrapper (put/get/delete, presigned URLs)
     validation/               Filename sanitization, size/type checks, zod request schemas
     security/                Share ID generation, password hashing, rate limiting, download tokens, scan() stub
+    client/                  Browser-only helpers: server-upload API client, auto-copy-on-mount, local recent-uploads history
     uploads/                  Drop creation, upload completion, atomic download claims
     p2p/                     Signaling server, TURN credentials, transfer metadata service
     p2p/client/               Browser-side WebRTC transfer engine + File System Access/Blob sinks
