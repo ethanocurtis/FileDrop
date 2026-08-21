@@ -4,6 +4,7 @@ import { getClientIp, uploadRateLimiter } from "@/lib/security/rateLimit";
 import { createDropSchema } from "@/lib/validation/schemas";
 import { isBlockedExtension, FileValidationError } from "@/lib/validation/file";
 import { prepareDrop } from "@/lib/uploads/service";
+import { bearerTokenFrom, verifyAdminSessionToken } from "@/lib/security/adminSession";
 import type { CreateDropResponse } from "@/types/drop";
 
 export const runtime = "nodejs";
@@ -31,6 +32,16 @@ export async function POST(request: Request) {
     if (isBlockedExtension(file.name)) {
       return apiError("VALIDATION_ERROR", `Files of this type are not allowed: ${file.name}`);
     }
+  }
+
+  // noExpiration is never taken on trust from the request body alone —
+  // it requires an admin session verified right here. A request that
+  // asks for it without a valid token is rejected outright rather than
+  // silently falling back to a normal expiration, since the only way
+  // that combination happens is a bug or a tampered request; the real
+  // UI never sends it without a valid session already in hand.
+  if (parsed.data.noExpiration && !verifyAdminSessionToken(bearerTokenFrom(request))) {
+    return apiError("ADMIN_REQUIRED", "Admin session required or expired.");
   }
 
   try {

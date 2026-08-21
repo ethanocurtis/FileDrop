@@ -69,6 +69,7 @@ export const downloadRateLimiter: RateLimiter = new InMemoryRateLimiter(60, 10 *
 export const passwordAttemptRateLimiter: RateLimiter = new InMemoryRateLimiter(10, 10 * 60 * 1000); // 10 password guesses / 10 min / IP+drop
 export const metadataRateLimiter: RateLimiter = new InMemoryRateLimiter(120, 10 * 60 * 1000); // 120 lookups / 10 min / IP
 export const p2pSignalRateLimiter: RateLimiter = new InMemoryRateLimiter(30, 10 * 60 * 1000); // 30 signaling connection attempts / 10 min / IP
+export const adminLoginRateLimiter: RateLimiter = new InMemoryRateLimiter(5, 15 * 60 * 1000); // 5 attempts / 15 min / IP — a single shared password is a higher-value guessing target than a per-drop one
 
 /** Best-effort client IP extraction behind common reverse proxies. */
 export function getClientIp(request: Request): string {

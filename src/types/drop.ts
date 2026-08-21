@@ -15,6 +15,10 @@ export interface CreateDropRequestBody {
   /** null/undefined = unlimited */
   maxDownloads?: number | null;
   burnAfterRead?: boolean;
+  /** Requires a valid admin session token sent as `Authorization: Bearer
+   * <token>` — see "Admin uploads" in the README. Ignored (not merely
+   * rejected) without one. */
+  noExpiration?: boolean;
 }
 
 export interface CreateDropResponseFile {
@@ -65,11 +69,17 @@ export type DropErrorCode =
   | "RATE_LIMITED"
   | "VALIDATION_ERROR"
   | "STORAGE_ERROR"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "ADMIN_REQUIRED";
 
 export interface ApiErrorBody {
   error: {
     code: DropErrorCode;
     message: string;
   };
+}
+
+export interface AdminLoginResponse {
+  token: string;
+  expiresAt: number;
 }

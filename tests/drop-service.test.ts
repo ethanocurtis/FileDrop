@@ -13,6 +13,7 @@ vi.mock("@/lib/storage/s3", () => ({
 // Imported after the mock so service.ts picks up the mocked module.
 const { deleteDropByToken, prepareDrop } = await import("@/lib/uploads/service");
 const { env } = await import("@/lib/env");
+const { isNeverExpires } = await import("@/lib/utils/time");
 
 beforeEach(async () => {
   await resetDatabase();
@@ -96,6 +97,40 @@ describe("prepareDrop — large-file expiration cap", () => {
     });
 
     expect(drop.expirationClamped).toBe(true);
+  });
+});
+
+describe("prepareDrop — admin no-expiration", () => {
+  it("sets the never-expires sentinel instead of a normal expiration", async () => {
+    const drop = await prepareDrop({
+      files: [{ name: "a.txt", size: 10, mimeType: "text/plain" }],
+      expiration: "1h",
+      noExpiration: true,
+    });
+
+    expect(isNeverExpires(drop.expiresAt)).toBe(true);
+  });
+
+  it("bypasses the large-file expiration cap regardless of file size", async () => {
+    const drop = await prepareDrop({
+      files: [
+        { name: "huge.bin", size: env.LARGE_FILE_THRESHOLD_BYTES, mimeType: "application/octet-stream" },
+      ],
+      expiration: "7d",
+      noExpiration: true,
+    });
+
+    expect(isNeverExpires(drop.expiresAt)).toBe(true);
+    expect(drop.expirationClamped).toBe(false);
+  });
+
+  it("leaves a normal request (noExpiration omitted) unaffected", async () => {
+    const drop = await prepareDrop({
+      files: [{ name: "a.txt", size: 10, mimeType: "text/plain" }],
+      expiration: "1h",
+    });
+
+    expect(isNeverExpires(drop.expiresAt)).toBe(false);
   });
 });
 

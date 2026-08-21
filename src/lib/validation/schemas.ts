@@ -28,6 +28,11 @@ export const createDropSchema = z.object({
     })
     .nullish(),
   burnAfterRead: z.boolean().optional().default(false),
+  // Requires a valid admin session (Authorization: Bearer <token>) —
+  // see POST /api/drops. Silently ignored server-side without one
+  // rather than trusted, so this being present in a request body proves
+  // nothing on its own.
+  noExpiration: z.boolean().optional().default(false),
 });
 
 export const unlockDropSchema = z.object({
@@ -36,6 +41,10 @@ export const unlockDropSchema = z.object({
 
 export const deleteDropSchema = z.object({
   deleteToken: z.string().min(1).max(200),
+});
+
+export const adminLoginSchema = z.object({
+  password: z.string().min(1).max(200),
 });
 
 // Generous sanity cap, not a real storage limit — the server never stores

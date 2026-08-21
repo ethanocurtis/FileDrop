@@ -65,3 +65,20 @@ export function formatAbsolute(date: Date): string {
     timeStyle: "short",
   }).format(date);
 }
+
+/**
+ * Stands in for a real "never expires" (nullable expiresAt would be the
+ * more conventional way to model that, but this avoids a schema
+ * migration — see prepareDrop() in src/lib/uploads/service.ts for where
+ * it's set, admin-only). Every existing `expiresAt <= now()`-style
+ * comparison (cleanup's sweep, the atomic download claim, the lazy
+ * expiry check) already just naturally never matches a date this far
+ * out, so nothing needed to change there — only display code needs to
+ * check for it explicitly, via isNeverExpires below, rather than trying
+ * to format or count down to it.
+ */
+export const NO_EXPIRATION_SENTINEL = new Date("9999-12-31T23:59:59.000Z");
+
+export function isNeverExpires(date: Date): boolean {
+  return date.getTime() >= NO_EXPIRATION_SENTINEL.getTime();
+}

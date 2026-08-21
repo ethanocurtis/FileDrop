@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Check, Info, RotateCcw, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Info, Infinity as InfinityIcon, RotateCcw, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -11,7 +11,7 @@ import { deleteDrop, ApiError } from "@/lib/client/api";
 import { useAutoCopyOnMount } from "@/lib/client/clipboard";
 import { removeRecentUpload } from "@/lib/client/recentUploads";
 import { formatBytes } from "@/lib/utils/bytes";
-import { formatAbsolute } from "@/lib/utils/time";
+import { formatAbsolute, isNeverExpires } from "@/lib/utils/time";
 
 export interface UploadedFileSummary {
   name: string;
@@ -41,6 +41,7 @@ export function UploadSuccess({
   const [deleted, setDeleted] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const autoCopied = useAutoCopyOnMount(shareUrl);
+  const neverExpires = isNeverExpires(expiresAt);
 
   async function handleConfirmDelete() {
     setDeleting(true);
@@ -116,7 +117,15 @@ export function UploadSuccess({
             </div>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Expires <span className="text-muted">{formatAbsolute(expiresAt)}</span>
+            {neverExpires ? (
+              <span className="inline-flex items-center gap-1 text-accent-strong">
+                <InfinityIcon className="h-3.5 w-3.5" /> Never expires
+              </span>
+            ) : (
+              <>
+                Expires <span className="text-muted">{formatAbsolute(expiresAt)}</span>
+              </>
+            )}
           </p>
           {expirationClamped && (
             <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -184,9 +193,11 @@ export function UploadSuccess({
         )}
       </div>
 
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Files are automatically deleted after expiration.
-      </p>
+      {!neverExpires && (
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Files are automatically deleted after expiration.
+        </p>
+      )}
     </Card>
   );
 }

@@ -79,6 +79,17 @@ const envSchema = z.object({
     .default("3478")
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().positive()),
+
+  // Optional. When set, unlocks a single shared "admin" capability (not
+  // a real account — see src/lib/security/adminSession.ts) that can
+  // upload with no expiration at all. Left unset, /api/admin/login
+  // always rejects and the feature is simply unreachable. Same
+  // empty-string-vs-unset normalization as TURN_SECRET above, for the
+  // same reason (docker-compose passes `${ADMIN_PASSWORD:-}`).
+  ADMIN_PASSWORD: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(8).optional(),
+  ),
 });
 
 function loadEnv() {

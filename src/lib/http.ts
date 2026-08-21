@@ -11,6 +11,7 @@ const STATUS_BY_CODE: Record<DropErrorCode, number> = {
   VALIDATION_ERROR: 400,
   STORAGE_ERROR: 502,
   INTERNAL_ERROR: 500,
+  ADMIN_REQUIRED: 401,
 };
 
 /**

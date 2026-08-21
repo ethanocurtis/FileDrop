@@ -11,7 +11,7 @@ import {
   subscribeToRecentUploads,
   type RecentUpload,
 } from "@/lib/client/recentUploads";
-import { formatTimeRemaining } from "@/lib/utils/time";
+import { formatTimeRemaining, isNeverExpires } from "@/lib/utils/time";
 
 /**
  * A small "recent uploads" panel, sourced entirely from this browser's
@@ -77,7 +77,9 @@ export function RecentUploads() {
 
       <div className="mt-4 grid gap-2">
         {entries.map((entry) => {
-          const timeRemaining = formatTimeRemaining(new Date(entry.expiresAt));
+          const expiresAt = new Date(entry.expiresAt);
+          const neverExpires = isNeverExpires(expiresAt);
+          const timeRemaining = formatTimeRemaining(expiresAt);
           const isConfirming = confirmingId === entry.shareId;
           const isBusy = busyId === entry.shareId;
 
@@ -94,7 +96,7 @@ export function RecentUploads() {
                       : `${entry.fileNames[0]} +${entry.fileNames.length - 1} more`}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {timeRemaining ? `Expires in ${timeRemaining}` : "Expired"}
+                    {neverExpires ? "Never expires" : timeRemaining ? `Expires in ${timeRemaining}` : "Expired"}
                   </p>
                 </div>
 

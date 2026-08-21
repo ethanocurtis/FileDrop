@@ -1,11 +1,12 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Infinity as InfinityIcon, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { ExpirationSelect } from "@/components/upload/ExpirationSelect";
 import { OptionsPanel, type DropOptions } from "@/components/upload/OptionsPanel";
+import { useAdminSession } from "@/lib/client/adminSession";
 import { formatBytes } from "@/lib/utils/bytes";
 import type { ExpirationValue } from "@/lib/utils/time";
 
@@ -19,6 +20,8 @@ export function ReviewStep({
   onRemoveFile,
   expiration,
   onExpirationChange,
+  noExpiration,
+  onNoExpirationChange,
   options,
   onOptionsChange,
   onUpload,
@@ -28,11 +31,14 @@ export function ReviewStep({
   onRemoveFile: (index: number) => void;
   expiration: ExpirationValue;
   onExpirationChange: (value: ExpirationValue) => void;
+  noExpiration: boolean;
+  onNoExpirationChange: (value: boolean) => void;
   options: DropOptions;
   onOptionsChange: (options: DropOptions) => void;
   onUpload: () => void;
   onCancel: () => void;
 }) {
+  const { isAdmin } = useAdminSession();
   return (
     <Card className="w-full p-6 sm:p-8 animate-fade-in">
       <h2 className="text-base font-semibold text-foreground">
@@ -66,7 +72,20 @@ export function ReviewStep({
       </div>
 
       <div className="mt-6">
-        <ExpirationSelect value={expiration} onChange={onExpirationChange} />
+        <ExpirationSelect value={expiration} onChange={onExpirationChange} disabled={noExpiration} />
+        {isAdmin && (
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              checked={noExpiration}
+              onChange={(e) => onNoExpirationChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border-strong bg-card accent-[var(--accent)]"
+            />
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <InfinityIcon className="h-3.5 w-3.5 text-accent-strong" /> Never expire (Admin)
+            </span>
+          </label>
+        )}
       </div>
       <div className="mt-6">
         <OptionsPanel options={options} onChange={onOptionsChange} />

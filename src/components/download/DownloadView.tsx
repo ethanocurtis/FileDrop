@@ -5,7 +5,7 @@ import { PasswordGate } from "@/components/download/PasswordGate";
 import { DownloadCard, type DownloadableFile } from "@/components/download/DownloadCard";
 import { ExpiredState } from "@/components/download/ExpiredState";
 import { unlockDrop, downloadFile, ApiError } from "@/lib/client/api";
-import { formatTimeRemaining } from "@/lib/utils/time";
+import { formatTimeRemaining, isNeverExpires } from "@/lib/utils/time";
 import type { PublicFileMetadata } from "@/types/drop";
 
 export interface DownloadViewInitialData {
@@ -26,15 +26,21 @@ export function DownloadView({ initial }: { initial: DownloadViewInitialData }) 
   );
   const [downloadCount, setDownloadCount] = useState(initial.downloadCount);
   const [gone, setGone] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState<string | null>(() =>
-    formatTimeRemaining(new Date(initial.expiresAt)),
-  );
 
   const expiresAt = new Date(initial.expiresAt);
+  const neverExpires = isNeverExpires(expiresAt);
+
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(() =>
+    neverExpires ? null : formatTimeRemaining(expiresAt),
+  );
 
   // Tick the "expires in" label and flip to the expired state client-side
   // the moment the deadline passes, without waiting on a server round trip.
+  // Skipped entirely for a never-expiring drop — there's nothing to count
+  // down to, and formatTimeRemaining on the far-future sentinel would just
+  // produce a huge, meaningless duration.
   useEffect(() => {
+    if (neverExpires) return;
     const interval = setInterval(() => {
       const remaining = formatTimeRemaining(expiresAt);
       setTimeRemaining(remaining);
@@ -42,7 +48,7 @@ export function DownloadView({ initial }: { initial: DownloadViewInitialData }) 
     }, 30_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initial.expiresAt]);
+  }, [initial.expiresAt, neverExpires]);
 
   async function handleUnlock(password: string): Promise<{ ok: boolean; message?: string }> {
     try {

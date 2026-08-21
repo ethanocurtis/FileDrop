@@ -4,6 +4,8 @@ import {
   expiresAtFor,
   formatTimeRemaining,
   isExpirationValue,
+  isNeverExpires,
+  NO_EXPIRATION_SENTINEL,
 } from "@/lib/utils/time";
 
 describe("expiresAtFor", () => {
@@ -52,5 +54,20 @@ describe("formatTimeRemaining", () => {
     expect(formatTimeRemaining(new Date("2026-01-02T00:00:00.000Z"), now)).toBe("1 day");
     expect(formatTimeRemaining(new Date("2026-01-01T01:00:00.000Z"), now)).toBe("1 hour");
     expect(formatTimeRemaining(new Date("2026-01-01T00:01:00.000Z"), now)).toBe("1 minute");
+  });
+});
+
+describe("isNeverExpires", () => {
+  it("is true for the sentinel itself", () => {
+    expect(isNeverExpires(NO_EXPIRATION_SENTINEL)).toBe(true);
+  });
+
+  it("is true for any date at or beyond the sentinel", () => {
+    expect(isNeverExpires(new Date("9999-12-31T23:59:59.000Z"))).toBe(true);
+  });
+
+  it("is false for a normal expiration date", () => {
+    expect(isNeverExpires(new Date("2026-01-08T00:00:00.000Z"))).toBe(false);
+    expect(isNeverExpires(expiresAtFor("7d"))).toBe(false);
   });
 });

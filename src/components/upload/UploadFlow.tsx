@@ -10,6 +10,7 @@ import { UploadSuccess, type UploadedFileSummary } from "@/components/upload/Upl
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { createDrop, uploadFileContent, cancelUploadSession, ApiError } from "@/lib/client/api";
+import { useAdminSession } from "@/lib/client/adminSession";
 import { addRecentUpload } from "@/lib/client/recentUploads";
 import { DEFAULT_EXPIRATION, type ExpirationValue } from "@/lib/utils/time";
 import { formatBytes } from "@/lib/utils/bytes";
@@ -34,6 +35,8 @@ export function UploadFlow() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [entries, setEntries] = useState<FileQueueEntry[]>([]);
   const [expiration, setExpiration] = useState<ExpirationValue>(DEFAULT_EXPIRATION);
+  const [noExpiration, setNoExpiration] = useState(false);
+  const { isAdmin, token: adminToken } = useAdminSession();
   const [options, setOptions] = useState<DropOptions>({
     password: "",
     maxDownloads: null,
@@ -90,6 +93,7 @@ export function UploadFlow() {
 
   const handleCancelReview = useCallback(() => {
     setPendingFiles([]);
+    setNoExpiration(false);
     setGlobalError(null);
     setPhase("idle");
   }, []);
@@ -109,15 +113,24 @@ export function UploadFlow() {
     setEntries(newEntries);
     setPhase("uploading");
 
+    // Only ever sent (and only honored server-side) when an admin
+    // session is actually active — the checkbox that sets this is itself
+    // hidden unless isAdmin, this is just belt-and-suspenders.
+    const effectiveNoExpiration = noExpiration && isAdmin;
+
     let created;
     try {
-      created = await createDrop({
-        files: files.map((f) => ({ name: f.name, size: f.size, mimeType: f.type })),
-        expiration,
-        password: options.password || undefined,
-        maxDownloads: options.maxDownloads,
-        burnAfterRead: options.burnAfterRead,
-      });
+      created = await createDrop(
+        {
+          files: files.map((f) => ({ name: f.name, size: f.size, mimeType: f.type })),
+          expiration,
+          password: options.password || undefined,
+          maxDownloads: options.maxDownloads,
+          burnAfterRead: options.burnAfterRead,
+          noExpiration: effectiveNoExpiration,
+        },
+        effectiveNoExpiration ? adminToken : undefined,
+      );
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Could not start the upload.";
       setGlobalError(message);
@@ -195,7 +208,7 @@ export function UploadFlow() {
       createdAt: new Date().toISOString(),
       expiresAt: created.expiresAt,
     });
-  }, [pendingFiles, expiration, options, updateEntry]);
+  }, [pendingFiles, expiration, noExpiration, isAdmin, adminToken, options, updateEntry]);
 
   const handleCancel = useCallback(
     (key: string) => {
@@ -213,6 +226,7 @@ export function UploadFlow() {
     setPendingFiles([]);
     setEntries([]);
     setSuccessData(null);
+    setNoExpiration(false);
     setGlobalError(null);
     setPhase("idle");
   }, []);
@@ -247,6 +261,8 @@ export function UploadFlow() {
           onRemoveFile={handleRemovePendingFile}
           expiration={expiration}
           onExpirationChange={setExpiration}
+          noExpiration={noExpiration}
+          onNoExpirationChange={setNoExpiration}
           options={options}
           onOptionsChange={setOptions}
           onUpload={handleStartUpload}

@@ -79,6 +79,10 @@ services:
       MAX_FILES_PER_DROP: ${MAX_FILES_PER_DROP:-10}
       LARGE_FILE_THRESHOLD_BYTES: ${LARGE_FILE_THRESHOLD_BYTES:-1073741824}
       LARGE_FILE_MAX_EXPIRATION: ${LARGE_FILE_MAX_EXPIRATION:-24h}
+      # Optional — unset/blank (the default) disables admin login (/admin)
+      # entirely. Set to enable uploads that never expire. See README
+      # "Admin uploads".
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # Optional — peer-to-peer transfers work without these (direct
       # connections only). Only needed if you've enabled the coturn
       # service below. Left blank (the default) rather than unset, so this

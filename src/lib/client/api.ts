@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AdminLoginResponse,
   ApiErrorBody,
   CreateDropRequestBody,
   CreateDropResponse,
@@ -27,11 +28,31 @@ async function parseErrorBody(res: Response): Promise<ApiError> {
   }
 }
 
-export async function createDrop(payload: CreateDropRequestBody): Promise<CreateDropResponse> {
+export async function createDrop(
+  payload: CreateDropRequestBody,
+  adminToken?: string | null,
+): Promise<CreateDropResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+
   const res = await fetch("/api/drops", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await parseErrorBody(res);
+  return res.json();
+}
+
+/** Exchanges the shared admin password for a session token — see
+ * src/lib/security/adminSession.ts. Throws ApiError("INVALID_PASSWORD")
+ * on a wrong password, ApiError("ADMIN_REQUIRED") if this deployment
+ * has no ADMIN_PASSWORD configured at all. */
+export async function adminLogin(password: string): Promise<AdminLoginResponse> {
+  const res = await fetch("/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
   });
   if (!res.ok) throw await parseErrorBody(res);
   return res.json();

@@ -88,6 +88,40 @@ in the first place. Note this only has any effect once
 `MAX_UPLOAD_SIZE_BYTES` (default 200 MB) is raised above the threshold —
 see "Configuration reference".
 
+## Admin uploads
+
+Optional, and off by default. Setting `ADMIN_PASSWORD` unlocks a
+`/admin` login page — one shared password, no username, no real account
+system — that lets whoever holds it upload files with **no expiration at
+all**, bypassing the large-file cap above too.
+
+- Logging in at `/admin` (`POST /api/admin/login`, constant-time compare,
+  rate-limited to 5 attempts per 15 minutes per IP) issues a signed,
+  stateless session token good for 24 hours, held in this browser's
+  `localStorage` (see `src/lib/client/adminSession.ts`) — nothing is
+  stored server-side, so there's no session to revoke early beyond
+  waiting it out or rotating `ADMIN_PASSWORD`.
+- While that session is active, the upload form (`/`) shows a "Never
+  expire (Admin)" checkbox. Checking it sends the request with
+  `Authorization: Bearer <token>`; `POST /api/drops` independently
+  re-verifies that token before honoring the flag — a request that asks
+  for no expiration without a valid session is rejected outright
+  (`ADMIN_REQUIRED`), never silently downgraded to a normal expiration.
+- "Never expires" is implemented as a far-future sentinel date rather
+  than a nullable column, specifically to avoid a schema migration (see
+  `NO_EXPIRATION_SENTINEL` in `src/lib/utils/time.ts`) — every existing
+  expiration check already just naturally never matches a date that far
+  out.
+- A never-expiring drop is **not** exempt from Delete Now, password
+  protection, download limits, or burn-after-read — it only skips the
+  automatic expiry. It also won't disappear on its own, so it's on you
+  to delete it when it's no longer needed.
+- This is intentionally minimal: one password shared out-of-band with
+  whoever you trust with unlimited-lifetime uploads, not a multi-admin
+  or audited system. Leave `ADMIN_PASSWORD` unset to disable `/admin`
+  entirely — `POST /api/admin/login` returns `ADMIN_REQUIRED` and the
+  upload form never shows the checkbox.
+
 ## Peer-to-peer transfers
 
 The `/p2p` tab is a second, independent way to send a file — it never
@@ -150,6 +184,7 @@ server.ts                   Custom server (Next.js + the P2P signaling WebSocket
 src/
   app/
     page.tsx                Homepage (upload)
+    admin/page.tsx           Admin login (unlocks never-expiring uploads)
     f/[shareId]/page.tsx     Download page (server-checks expiration before rendering)
     p2p/page.tsx             Peer-to-peer send flow
     p2p/[shareId]/page.tsx    Peer-to-peer receive flow
@@ -157,19 +192,21 @@ src/
       drops/                 Create a drop, stream file bytes to storage
       share/[shareId]/        Metadata, password unlock, download
       p2p/                     Create/fetch/unlock a P2P transfer, ICE server config
+      admin/login/             Password check → admin session token
       cleanup/                 Cron-triggered expiry sweep (bearer-token protected)
   components/
     ui/                      Logo, Button, Card, CopyButton, QrCode, FileIcon, ProgressBar
     upload/                  Dropzone, expiration picker, options panel, progress, success screen, recent-uploads panel
     download/                Password gate, download card, expired state
     p2p/                     Mode tabs, review step, status panel, send/receive flows
+    admin/                   Login form, footer login/logout status indicator
   lib/
     prisma.ts                Prisma client singleton
     env.ts                   Validated environment config (zod)
     storage/s3.ts            S3-compatible client wrapper (put/get/delete, presigned URLs)
     validation/               Filename sanitization, size/type checks, zod request schemas
-    security/                Share ID generation, password hashing, rate limiting, download tokens, scan() stub
-    client/                  Browser-only helpers: server-upload API client, auto-copy-on-mount, local recent-uploads history
+    security/                Share ID generation, password hashing, rate limiting, download tokens, admin session tokens
+    client/                  Browser-only helpers: server-upload API client, auto-copy-on-mount, local recent-uploads history, admin session
     uploads/                  Drop creation, upload completion, atomic download claims
     p2p/                     Signaling server, TURN credentials, transfer metadata service
     p2p/client/               Browser-side WebRTC transfer engine + File System Access/Blob sinks
@@ -566,6 +603,8 @@ See `.env.example` for the full list. Notable ones:
   transfers" above). Both `TURN_SECRET` and `TURN_EXTERNAL_IP` need to be
   set for TURN to activate; leaving them unset just means
   `getIceServers()` returns the public STUN server only.
+- `ADMIN_PASSWORD` — optional, enables `/admin` login and
+  never-expiring uploads (see "Admin uploads" above). Unset by default.
 
 ## Deploying
 

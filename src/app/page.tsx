@@ -2,6 +2,7 @@ import { Logo } from "@/components/ui/Logo";
 import { ModeTabs } from "@/components/p2p/ModeTabs";
 import { UploadFlow } from "@/components/upload/UploadFlow";
 import { RecentUploads } from "@/components/upload/RecentUploads";
+import { AdminStatus } from "@/components/admin/AdminStatus";
 
 export default function Home() {
   return (
@@ -28,8 +29,9 @@ export default function Home() {
         <RecentUploads />
       </main>
 
-      <footer className="mx-auto w-full max-w-3xl px-6 pb-8 text-center text-xs text-muted-foreground">
-        Files are automatically deleted after expiration.
+      <footer className="mx-auto flex w-full max-w-3xl flex-col items-center gap-1.5 px-6 pb-8 text-center text-xs text-muted-foreground">
+        <span>Files are automatically deleted after expiration.</span>
+        <AdminStatus />
       </footer>
     </div>
   );

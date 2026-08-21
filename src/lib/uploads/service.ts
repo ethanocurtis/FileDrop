@@ -10,7 +10,12 @@ import {
   FileValidationError,
 } from "@/lib/validation/file";
 import { env } from "@/lib/env";
-import { expiresAtFor, expirationMsFor, type ExpirationValue } from "@/lib/utils/time";
+import {
+  expiresAtFor,
+  expirationMsFor,
+  NO_EXPIRATION_SENTINEL,
+  type ExpirationValue,
+} from "@/lib/utils/time";
 import type { DropStatus } from "@/generated/prisma";
 import type { CreateDropFileInput } from "@/types/drop";
 
@@ -44,6 +49,10 @@ export async function prepareDrop(input: {
   password?: string;
   maxDownloads?: number | null;
   burnAfterRead?: boolean;
+  /** Only ever true when the caller (the API route) has already
+   * verified an admin session — prepareDrop trusts it unconditionally,
+   * so authorization must happen before this is ever set. */
+  noExpiration?: boolean;
 }): Promise<PreparedDrop> {
   assertFileCountIsAllowed(input.files.length);
   for (const file of input.files) {
@@ -63,12 +72,16 @@ export async function prepareDrop(input: {
   // exposure window) — clamp down to the policy max instead of rejecting
   // the request outright. Only ever shortens: a file over the threshold
   // whose requested expiration is already <= the cap is left alone.
+  // Skipped entirely for an admin no-expiration upload — that's a
+  // deliberate override of this whole policy, not a normal request.
   const maxFileSize = Math.max(...input.files.map((f) => f.size));
   const isLargeFile = maxFileSize >= env.LARGE_FILE_THRESHOLD_BYTES;
   const exceedsCap =
-    isLargeFile && expirationMsFor(input.expiration) > expirationMsFor(env.LARGE_FILE_MAX_EXPIRATION);
+    !input.noExpiration &&
+    isLargeFile &&
+    expirationMsFor(input.expiration) > expirationMsFor(env.LARGE_FILE_MAX_EXPIRATION);
   const effectiveExpiration = exceedsCap ? env.LARGE_FILE_MAX_EXPIRATION : input.expiration;
-  const expiresAt = expiresAtFor(effectiveExpiration);
+  const expiresAt = input.noExpiration ? NO_EXPIRATION_SENTINEL : expiresAtFor(effectiveExpiration);
 
   const preparedFiles: PreparedDropFile[] = input.files.map((file) => {
     const fileId = randomUUID();
