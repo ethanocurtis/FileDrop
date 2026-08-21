@@ -69,7 +69,7 @@ export function RecentUploads() {
   }
 
   return (
-    <Card className="mt-6 w-full p-5 sm:p-6 animate-fade-in">
+    <Card className="mt-6 w-full p-4 sm:p-6 animate-fade-in">
       <h2 className="text-sm font-semibold text-foreground">Recent uploads</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         Only visible in this browser — nothing here is tied to an account.
@@ -86,9 +86,9 @@ export function RecentUploads() {
           return (
             <div
               key={entry.shareId}
-              className="rounded-xl border border-border bg-background-elevated px-4 py-3"
+              className="rounded-xl border border-border bg-background-elevated px-3.5 py-2.5 sm:px-4 sm:py-3"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">
                     {entry.fileNames.length === 1

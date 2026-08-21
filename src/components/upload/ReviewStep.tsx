@@ -40,7 +40,7 @@ export function ReviewStep({
 }) {
   const { isAdmin } = useAdminSession();
   return (
-    <Card className="w-full p-6 sm:p-8 animate-fade-in">
+    <Card className="w-full p-4 sm:p-8 animate-fade-in">
       <h2 className="text-base font-semibold text-foreground">
         {files.length === 1 ? "1 file selected" : `${files.length} files selected`}
       </h2>
@@ -52,9 +52,9 @@ export function ReviewStep({
         {files.map((file, i) => (
           <div
             key={`${file.name}-${file.size}-${i}`}
-            className="flex items-center gap-3 rounded-xl border border-border bg-background-elevated px-4 py-3"
+            className="flex items-center gap-2.5 rounded-xl border border-border bg-background-elevated px-3.5 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
           >
-            <FileIcon mimeType={file.type} className="h-6 w-6 shrink-0 text-muted" />
+            <FileIcon mimeType={file.type} className="h-5 w-5 shrink-0 text-muted sm:h-6 sm:w-6" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
               <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>

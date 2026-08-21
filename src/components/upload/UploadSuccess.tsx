@@ -74,7 +74,7 @@ export function UploadSuccess({
   }
 
   return (
-    <Card className="w-full p-6 sm:p-8 animate-fade-in">
+    <Card className="w-full p-4 sm:p-8 animate-fade-in">
       <div className="flex flex-col items-center text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success animate-pop">
           <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
@@ -95,9 +95,9 @@ export function UploadSuccess({
         {files.map((file, i) => (
           <div
             key={`${file.name}-${i}`}
-            className="flex items-center gap-3 rounded-xl border border-border bg-background-elevated px-4 py-3"
+            className="flex items-center gap-2.5 rounded-xl border border-border bg-background-elevated px-3.5 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
           >
-            <FileIcon mimeType={file.mimeType} className="h-6 w-6 text-muted" />
+            <FileIcon mimeType={file.mimeType} className="h-5 w-5 shrink-0 text-muted sm:h-6 sm:w-6" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
               <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>

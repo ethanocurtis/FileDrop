@@ -23,8 +23,8 @@ export function FileQueueItem({
   const isActive = entry.status === "uploading" || entry.status === "queued";
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 animate-fade-in">
-      <FileIcon mimeType={entry.file.type} className="h-8 w-8 text-muted" />
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 animate-fade-in sm:gap-3 sm:px-4 sm:py-3">
+      <FileIcon mimeType={entry.file.type} className="h-7 w-7 shrink-0 text-muted sm:h-8 sm:w-8" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">

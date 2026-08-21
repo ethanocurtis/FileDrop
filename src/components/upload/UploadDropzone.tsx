@@ -56,7 +56,7 @@ export function UploadDropzone({
         handleFiles(e.dataTransfer.files);
       }}
       className={clsx(
-        "group relative flex w-full cursor-pointer flex-col items-center justify-center gap-4 overflow-hidden rounded-[var(--radius-lg)] border-2 border-dashed px-8 py-16 text-center transition-all duration-200 sm:py-20",
+        "group relative flex w-full cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-[var(--radius-lg)] border-2 border-dashed px-4 py-8 text-center transition-all duration-200 sm:gap-4 sm:px-8 sm:py-20",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         disabled && "cursor-not-allowed opacity-60",
         isDragging
@@ -72,21 +72,24 @@ export function UploadDropzone({
       />
       <div
         className={clsx(
-          "flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-background-elevated transition-transform duration-200",
+          "flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background-elevated transition-transform duration-200 sm:h-16 sm:w-16",
           isDragging ? "scale-110 border-accent/50" : "group-hover:scale-105",
         )}
       >
         <UploadCloud
-          className={clsx("h-7 w-7 transition-colors", isDragging ? "text-accent-strong" : "text-muted")}
+          className={clsx(
+            "h-5 w-5 transition-colors sm:h-7 sm:w-7",
+            isDragging ? "text-accent-strong" : "text-muted",
+          )}
           strokeWidth={1.75}
         />
       </div>
 
       <div>
-        <p className="text-base font-medium text-foreground">
+        <p className="text-sm font-medium text-foreground sm:text-base">
           {isDragging ? "Drop it here" : "Drag & drop files here"}
         </p>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-xs text-muted sm:text-sm">
           or <span className="text-accent-strong underline underline-offset-2">browse</span> from your device
         </p>
       </div>
