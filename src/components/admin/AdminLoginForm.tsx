@@ -12,9 +12,10 @@ import { setAdminSession } from "@/lib/client/adminSession";
  * The entire "admin auth" UI: one password field, no username, no
  * accounts. A correct password gets a session token stored in
  * localStorage (see src/lib/client/adminSession.ts) that unlocks the
- * "never expire" option on the upload form.
+ * "never expire" option on the upload form, and — via `redirectTo` —
+ * whatever admin-only page the user was actually trying to reach.
  */
-export function AdminLoginForm() {
+export function AdminLoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export function AdminLoginForm() {
     try {
       const session = await adminLogin(password);
       setAdminSession(session);
-      router.push("/");
+      router.push(redirectTo);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {

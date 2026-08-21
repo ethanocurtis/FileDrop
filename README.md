@@ -116,6 +116,15 @@ all**, bypassing the large-file cap above too.
   protection, download limits, or burn-after-read — it only skips the
   automatic expiry. It also won't disappear on its own, so it's on you
   to delete it when it's no longer needed.
+- **Managing uploads later.** The uploader's own "Delete Now" / Recent
+  Uploads only work from the specific browser that created the drop —
+  fine for a normal link, but a real gap for one that never expires on
+  its own. `/admin/drops` (linked from the footer as "Manage uploads"
+  once logged in) lists every non-deleted drop on the server, with a
+  Delete button for each — independent of any browser's `localStorage`,
+  gated by the same admin session (`GET`/`DELETE /api/admin/drops`).
+  This is the actual way to get rid of a never-expiring drop if the
+  browser that made it is gone.
 - This is intentionally minimal: one password shared out-of-band with
   whoever you trust with unlimited-lifetime uploads, not a multi-admin
   or audited system. Leave `ADMIN_PASSWORD` unset to disable `/admin`
@@ -185,6 +194,7 @@ src/
   app/
     page.tsx                Homepage (upload)
     admin/page.tsx           Admin login (unlocks never-expiring uploads)
+    admin/drops/page.tsx      Admin dashboard — list/delete any drop on the server
     f/[shareId]/page.tsx     Download page (server-checks expiration before rendering)
     p2p/page.tsx             Peer-to-peer send flow
     p2p/[shareId]/page.tsx    Peer-to-peer receive flow
@@ -193,13 +203,14 @@ src/
       share/[shareId]/        Metadata, password unlock, download
       p2p/                     Create/fetch/unlock a P2P transfer, ICE server config
       admin/login/             Password check → admin session token
+      admin/drops/             List/delete any drop (admin-session gated)
       cleanup/                 Cron-triggered expiry sweep (bearer-token protected)
   components/
     ui/                      Logo, Button, Card, CopyButton, QrCode, FileIcon, ProgressBar
     upload/                  Dropzone, expiration picker, options panel, progress, success screen, recent-uploads panel
     download/                Password gate, download card, expired state
     p2p/                     Mode tabs, review step, status panel, send/receive flows
-    admin/                   Login form, footer login/logout status indicator
+    admin/                   Login form, dashboard (list/delete all drops), footer status indicator
   lib/
     prisma.ts                Prisma client singleton
     env.ts                   Validated environment config (zod)

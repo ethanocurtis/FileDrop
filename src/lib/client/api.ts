@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AdminDropsResponse,
   AdminLoginResponse,
   ApiErrorBody,
   CreateDropRequestBody,
@@ -56,6 +57,27 @@ export async function adminLogin(password: string): Promise<AdminLoginResponse> 
   });
   if (!res.ok) throw await parseErrorBody(res);
   return res.json();
+}
+
+/** Every non-deleted drop, independent of which browser created it —
+ * see "Admin uploads" in the README. */
+export async function adminListDrops(token: string): Promise<AdminDropsResponse> {
+  const res = await fetch("/api/admin/drops", {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw await parseErrorBody(res);
+  return res.json();
+}
+
+/** Admin-authorized delete — works even if this browser never held (or
+ * has since lost) the drop's own capability token. */
+export async function adminDeleteDropByShareId(shareId: string, token: string): Promise<void> {
+  const res = await fetch(`/api/admin/drops/${shareId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw await parseErrorBody(res);
 }
 
 export interface UploadProgress {

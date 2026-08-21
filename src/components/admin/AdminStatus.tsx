@@ -20,7 +20,12 @@ export function AdminStatus() {
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      Admin ✓
+      <span>Admin ✓</span>
+      <span aria-hidden>·</span>
+      <Link href="/admin/drops" className="hover:text-foreground hover:underline">
+        Manage uploads
+      </Link>
+      <span aria-hidden>·</span>
       <button
         type="button"
         onClick={() => clearAdminSession()}

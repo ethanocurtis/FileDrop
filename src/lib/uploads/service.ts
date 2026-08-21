@@ -225,14 +225,25 @@ export type DeleteDropResult =
   | { ok: true }
   | { ok: false; reason: "not_found" | "invalid_token" };
 
+/** Shared by deleteDropByToken and adminDeleteDrop below — best-effort
+ * removal of every storage object, then mark the row DELETED (kept, not
+ * hard-deleted, so a later visit to /f/{shareId} still gets a clean
+ * "no longer available" instead of an ambiguous 404 — same reasoning as
+ * the cleanup job). */
+async function performDelete(drop: { id: string; files: { storageKey: string }[] }): Promise<void> {
+  for (const file of drop.files) {
+    await deleteObject(file.storageKey).catch(() => {
+      // Best-effort — an object that's already gone (or never finished
+      // uploading) isn't a reason to fail this.
+    });
+  }
+  await prisma.drop.update({ where: { id: drop.id }, data: { status: "DELETED" } });
+}
+
 /**
  * Lets the uploader delete their own drop early, using the capability
  * token they were shown once at creation time — there are no accounts,
- * so this token is the only proof of "I made this" available. Deletes
- * every storage object best-effort, then marks the row DELETED (kept,
- * not hard-deleted, so a later visit to /f/{shareId} still gets a clean
- * "no longer available" instead of an ambiguous 404 — same reasoning as
- * the cleanup job).
+ * so this token is the only proof of "I made this" available.
  *
  * Works from any non-DELETED status (PENDING/ACTIVE/EXPIRED) — someone
  * who has the token clearly wants it gone regardless of where the drop
@@ -255,13 +266,69 @@ export async function deleteDropByToken(shareId: string, token: string): Promise
     return { ok: false, reason: "invalid_token" };
   }
 
-  for (const file of drop.files) {
-    await deleteObject(file.storageKey).catch(() => {
-      // Best-effort, same as the cleanup job — an object that's already
-      // gone (or never finished uploading) isn't a reason to fail this.
-    });
+  await performDelete(drop);
+  return { ok: true };
+}
+
+export interface AdminDropListItem {
+  shareId: string;
+  status: DropStatus;
+  createdAt: Date;
+  expiresAt: Date;
+  requiresPassword: boolean;
+  burnAfterRead: boolean;
+  maxDownloads: number | null;
+  downloadCount: number;
+  files: { name: string; size: bigint }[];
+}
+
+/**
+ * The whole point of admin login existing beyond the upload-time
+ * checkbox: a way to find and remove a drop later that isn't tied to
+ * whatever browser happened to create it (see "Recent uploads" for why
+ * that's not enough on its own, especially for a never-expiring drop).
+ * Excludes DELETED rows; caps at MAX_ADMIN_DROP_LIST so a long-lived
+ * deployment doesn't return an unbounded list.
+ */
+const MAX_ADMIN_DROP_LIST = 200;
+
+export async function listDropsForAdmin(): Promise<AdminDropListItem[]> {
+  const drops = await prisma.drop.findMany({
+    where: { status: { not: "DELETED" } },
+    orderBy: { createdAt: "desc" },
+    take: MAX_ADMIN_DROP_LIST,
+    include: { files: true },
+  });
+
+  return drops.map((drop) => ({
+    shareId: drop.shareId,
+    status: drop.status,
+    createdAt: drop.createdAt,
+    expiresAt: drop.expiresAt,
+    requiresPassword: Boolean(drop.passwordHash),
+    burnAfterRead: drop.burnAfterRead,
+    maxDownloads: drop.maxDownloads,
+    downloadCount: drop.downloadCount,
+    files: drop.files.map((f) => ({ name: f.sanitizedFileName, size: f.size })),
+  }));
+}
+
+export type AdminDeleteDropResult = { ok: true } | { ok: false; reason: "not_found" };
+
+/**
+ * Same effect as deleteDropByToken, but authorized by an admin session
+ * instead of the per-drop capability token — the API route verifies that
+ * before this is ever called, so no token check happens here.
+ */
+export async function adminDeleteDrop(shareId: string): Promise<AdminDeleteDropResult> {
+  const drop = await prisma.drop.findUnique({
+    where: { shareId },
+    include: { files: true },
+  });
+  if (!drop || drop.status === "DELETED") {
+    return { ok: false, reason: "not_found" };
   }
 
-  await prisma.drop.update({ where: { id: drop.id }, data: { status: "DELETED" } });
+  await performDelete(drop);
   return { ok: true };
 }

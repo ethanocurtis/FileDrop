@@ -11,9 +11,11 @@ vi.mock("@/lib/storage/s3", () => ({
 }));
 
 // Imported after the mock so service.ts picks up the mocked module.
-const { deleteDropByToken, prepareDrop } = await import("@/lib/uploads/service");
+const { adminDeleteDrop, deleteDropByToken, listDropsForAdmin, prepareDrop } = await import(
+  "@/lib/uploads/service"
+);
 const { env } = await import("@/lib/env");
-const { isNeverExpires } = await import("@/lib/utils/time");
+const { isNeverExpires, NO_EXPIRATION_SENTINEL } = await import("@/lib/utils/time");
 
 beforeEach(async () => {
   await resetDatabase();
@@ -187,5 +189,82 @@ describe("deleteDropByToken", () => {
 
     const rowA = await prisma.drop.findUniqueOrThrow({ where: { id: a.dropId } });
     expect(rowA.status).toBe("ACTIVE");
+  });
+});
+
+describe("listDropsForAdmin", () => {
+  it("lists non-deleted drops, newest first, without needing any token", async () => {
+    const older = await createTestDrop();
+    await new Promise((r) => setTimeout(r, 5));
+    const newer = await createTestDrop();
+
+    const drops = await listDropsForAdmin();
+    const shareIds = drops.map((d) => d.shareId);
+    expect(shareIds.indexOf(newer.shareId)).toBeLessThan(shareIds.indexOf(older.shareId));
+  });
+
+  it("excludes DELETED drops", async () => {
+    const deleted = await createTestDrop({ status: "DELETED" });
+    const drops = await listDropsForAdmin();
+    expect(drops.some((d) => d.shareId === deleted.shareId)).toBe(false);
+  });
+
+  it("includes a never-expiring drop like any other, with the sentinel as its expiresAt", async () => {
+    const { shareId } = await createTestDrop({ expiresAt: NO_EXPIRATION_SENTINEL });
+    const drops = await listDropsForAdmin();
+    const found = drops.find((d) => d.shareId === shareId);
+    expect(found).toBeDefined();
+    expect(isNeverExpires(found!.expiresAt)).toBe(true);
+  });
+
+  it("reports password protection, burn-after-read, and download counts correctly", async () => {
+    const { shareId } = await createTestDrop({
+      passwordHash: "some-bcrypt-hash",
+      burnAfterRead: true,
+      maxDownloads: 3,
+      downloadCount: 1,
+    });
+
+    const found = (await listDropsForAdmin()).find((d) => d.shareId === shareId);
+    expect(found).toMatchObject({
+      requiresPassword: true,
+      burnAfterRead: true,
+      maxDownloads: 3,
+      downloadCount: 1,
+    });
+  });
+});
+
+describe("adminDeleteDrop", () => {
+  it("deletes storage objects and marks the drop DELETED — no token needed", async () => {
+    const { shareId, dropId } = await createTestDrop();
+
+    const result = await adminDeleteDrop(shareId);
+    expect(result).toEqual({ ok: true });
+    expect(deleteObject).toHaveBeenCalledTimes(1);
+
+    const row = await prisma.drop.findUniqueOrThrow({ where: { id: dropId } });
+    expect(row.status).toBe("DELETED");
+  });
+
+  it("rejects an unknown share ID", async () => {
+    const result = await adminDeleteDrop("does-not-exist");
+    expect(result).toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("rejects deleting a drop that's already DELETED", async () => {
+    const { shareId } = await createTestDrop({ status: "DELETED" });
+    const result = await adminDeleteDrop(shareId);
+    expect(result).toEqual({ ok: false, reason: "not_found" });
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
+  it("works on a never-expiring drop, same as any other", async () => {
+    const { shareId, dropId } = await createTestDrop({ expiresAt: NO_EXPIRATION_SENTINEL });
+    const result = await adminDeleteDrop(shareId);
+    expect(result).toEqual({ ok: true });
+
+    const row = await prisma.drop.findUniqueOrThrow({ where: { id: dropId } });
+    expect(row.status).toBe("DELETED");
   });
 });

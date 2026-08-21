@@ -83,3 +83,24 @@ export interface AdminLoginResponse {
   token: string;
   expiresAt: number;
 }
+
+export interface AdminDropFileSummary {
+  name: string;
+  size: string; // serialized BigInt
+}
+
+export interface AdminDropSummary {
+  shareId: string;
+  status: "PENDING" | "ACTIVE" | "EXPIRED";
+  createdAt: string;
+  expiresAt: string;
+  requiresPassword: boolean;
+  burnAfterRead: boolean;
+  maxDownloads: number | null;
+  downloadCount: number;
+  files: AdminDropFileSummary[];
+}
+
+export interface AdminDropsResponse {
+  drops: AdminDropSummary[];
+}
