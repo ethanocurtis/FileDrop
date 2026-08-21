@@ -100,7 +100,7 @@ export function AdminDropsView() {
       )}
 
       {drops !== null && drops.length > 0 && (
-        <div className="mt-6 grid gap-2">
+        <div className="mt-6 grid grid-cols-1 gap-2">
           {drops.map((drop) => {
             const expiresAt = new Date(drop.expiresAt);
             const neverExpires = isNeverExpires(expiresAt);

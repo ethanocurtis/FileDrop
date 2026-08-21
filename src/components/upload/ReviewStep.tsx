@@ -48,7 +48,7 @@ export function ReviewStep({
         Set your options, then upload when you&apos;re ready.
       </p>
 
-      <div className="mt-5 grid gap-2">
+      <div className="mt-5 grid grid-cols-1 gap-2">
         {files.map((file, i) => (
           <div
             key={`${file.name}-${file.size}-${i}`}

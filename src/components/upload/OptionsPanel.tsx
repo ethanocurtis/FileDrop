@@ -37,7 +37,7 @@ export function OptionsPanel({
       </button>
 
       {open && (
-        <div className="mt-4 grid gap-5 rounded-xl border border-border bg-background-elevated/60 p-4 animate-fade-in">
+        <div className="mt-4 grid grid-cols-1 gap-5 rounded-xl border border-border bg-background-elevated/60 p-4 animate-fade-in">
           <div>
             <label htmlFor={passwordId} className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted">
               <Lock className="h-3.5 w-3.5" /> Password protect (optional)

@@ -75,7 +75,7 @@ export function RecentUploads() {
         Only visible in this browser — nothing here is tied to an account.
       </p>
 
-      <div className="mt-4 grid gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-2">
         {entries.map((entry) => {
           const expiresAt = new Date(entry.expiresAt);
           const neverExpires = isNeverExpires(expiresAt);

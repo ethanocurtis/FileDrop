@@ -35,7 +35,7 @@ export function DownloadCard({
           {timeRemaining && (
             <p className="mt-1 text-center text-sm text-muted">Expires in {timeRemaining}</p>
           )}
-          <div className="mt-6 grid gap-2">
+          <div className="mt-6 grid grid-cols-1 gap-2">
             {files.map((file) => (
               <FileRow key={file.fileId} file={file} onDownload={onDownload} />
             ))}

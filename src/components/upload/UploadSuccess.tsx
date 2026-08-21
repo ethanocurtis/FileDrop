@@ -91,7 +91,7 @@ export function UploadSuccess({
         <p className="mt-1 text-sm text-muted">Share this link — it expires automatically.</p>
       </div>
 
-      <div className="mt-6 grid gap-2">
+      <div className="mt-6 grid grid-cols-1 gap-2">
         {files.map((file, i) => (
           <div
             key={`${file.name}-${i}`}
